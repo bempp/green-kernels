@@ -15,17 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature-flags: ['--features "mpi,strict"', '']
+        feature-flags: ['--features "strict"', '']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           components: rustfmt,clippy
-      - name: Set up MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: mpich
       - uses: actions/checkout@v3
       - name: Install LAPACK & OpenBLAS
         run:

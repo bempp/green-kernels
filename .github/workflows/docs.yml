@@ -16,14 +16,10 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: "nightly"
-      - name: Set up MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: "mpich"
       - uses: actions/checkout@v3
 
       - name: Build docs
-        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "mpi,strict"
+        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "strict"
 
   build-and-deploy-docs:
     name: Build and deploy docs
@@ -45,14 +41,10 @@ jobs:
         with:
           toolchain: "nightly"
           components: rustfmt
-      - name: Set up MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: "mpich"
       - uses: actions/checkout@v3
 
       - name: Build docs
-        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "mpi"
+        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples
 
       - name: Set file permissions
         run: |
