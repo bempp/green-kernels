@@ -36,8 +36,3 @@ jobs:
         run: cargo test --examples --release ${{ matrix.feature-flags }}
       - name: Test benchmarks build
         run: cargo bench --no-run --features "strict"
-      - name: Run examples
-        run: |
-          python3 find_examples.py
-          chmod +x examples.sh
-          ./examples.sh

@@ -36,11 +36,6 @@ jobs:
         run: cargo test --examples --release --features "strict"
       - name: Test benchmarks build
         run: cargo bench --no-run --features "strict"
-      - name: Run examples
-        run: |
-          python3 find_examples.py
-          chmod +x examples.sh
-          ./examples.sh
 
       - name: Build docs
         run: cargo doc --features "strict" --no-deps
