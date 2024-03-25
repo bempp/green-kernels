@@ -511,13 +511,11 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::RlstScalar;
+    use rlst::c64;
     use rlst::{
         Array, BaseArray, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape,
         VectorContainer,
     };
-
-    use rlst::c64;
 
     fn copy(
         m_in: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
