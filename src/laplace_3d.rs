@@ -397,7 +397,7 @@ mod test {
     use approx::assert_relative_eq;
     use rand::prelude::*;
     use rlst::{
-        rlst_dynamic_array1, Array, BaseArray, RandomAccessByRef,
+        rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray, RandomAccessByRef,
         RandomAccessMut, RawAccess, RawAccessMut, Shape, VectorContainer,
     };
 
