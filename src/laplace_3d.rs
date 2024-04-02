@@ -397,7 +397,7 @@ mod test {
     use approx::assert_relative_eq;
     use rand::prelude::*;
     use rlst::{
-        rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray, RandomAccessByRef,
+        rlst_dynamic_array1, Array, BaseArray, RandomAccessByRef,
         RandomAccessMut, RawAccess, RawAccessMut, Shape, VectorContainer,
     };
 
@@ -443,7 +443,7 @@ mod test {
         let sources = rand_mat([nsources, 3]);
         let targets = rand_mat([ntargets, 3]);
         let charges = rand_vec(nsources);
-        let mut green_value = rlst::dense::rlst_dynamic_array2!(f64, [ntargets, 1]);
+        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, 1]);
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
