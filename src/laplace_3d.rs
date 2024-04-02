@@ -443,7 +443,7 @@ mod test {
         let sources = rand_mat([nsources, 3]);
         let targets = rand_mat([ntargets, 3]);
         let charges = rand_vec(nsources);
-        let mut green_value = rlst::dense::rlst_dynamic_array2!(f64, [ntargets, 1]);
+        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, 1]);
 
         Laplace3dKernel::<f64>::default().evaluate_st(
             EvalType::Value,
