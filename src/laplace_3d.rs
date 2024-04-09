@@ -10,7 +10,7 @@ use rlst::RlstScalar;
 use std::marker::PhantomData;
 
 /// Kernel for Laplace in 3D
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Laplace3dKernel<T: RlstScalar> {
     _phantom_t: std::marker::PhantomData<T>,
 }
@@ -21,12 +21,6 @@ impl<T: RlstScalar> Laplace3dKernel<T> {
         Self {
             _phantom_t: PhantomData,
         }
-    }
-}
-
-impl<T: RlstScalar> Default for Laplace3dKernel<T> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
