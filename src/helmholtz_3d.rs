@@ -13,7 +13,8 @@ use std::marker::PhantomData;
 /// Kernel for Helmholtz in 3D
 #[derive(Clone, Default)]
 pub struct Helmholtz3dKernel<T: RlstScalar> {
-    wavenumber: T::Real,
+    /// Wavenumber
+    pub wavenumber: T::Real,
     _phantom_t: std::marker::PhantomData<T>,
 }
 
