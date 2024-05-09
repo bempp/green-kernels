@@ -470,6 +470,8 @@ mod test {
             targets_y_eps[[index, 1]] += eps;
             targets_z_eps[[index, 2]] += eps;
         }
+        // println!("HERE FPP {:?} {:?} {:?} {:?}", targets_x_eps.data(), targets_x_eps[[0, 0]], targets_x_eps[[1, 0]], targets_x_eps[[2, 0]]);
+        // assert!(false);
 
         let mut expected = rlst_dynamic_array2!(f64, [4, ntargets]);
 
