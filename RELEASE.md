@@ -17,7 +17,7 @@ To make a new release of green-kernels, follow the following steps:
    If you are releasing a minor version, you should increment `[y]` and set `[z]`
    to zero. If you are releasing a bugfix, you should increment `[z]`.
 
-3) Commit you changes and push to GitHub, and check that all the tests on CI pass.
+3) Commit your changes and push to GitHub, and check that all the tests on CI pass.
 
 4) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
    The release tag and title should be `v[x].[y].[z]` (where `[x]`, `[y]` and `[z]` are as in step 2).
