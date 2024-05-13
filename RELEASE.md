@@ -17,19 +17,19 @@ To make a new release of green-kernels, follow the following steps:
    If you are releasing a minor version, you should increment `[y]` and set `[z]`
    to zero. If you are releasing a bugfix, you should increment `[z]`.
 
-3) Commit you changes and push to GitHub, and check that all the tests on CI pass.
+3) In `Cargo.toml`, check that the `rlst` dependency is at the latest version.
 
-4) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
+4) Commit your changes and push to GitHub, and check that all the tests on CI pass.
+
+5) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
    The release tag and title should be `v[x].[y].[z]` (where `[x]`, `[y]` and `[z]` are as in step 2).
    In the "Describe this release" box, you should bullet point the main changes since the last
    release.
 
-6) In `Cargo.toml`, check that the `rlst` dependency is at the latest version.
-
-7) Run `cargo publish --dry-run`, then run `cargo package --list` and
+6) Run `cargo publish --dry-run`, then run `cargo package --list` and
    check that no unwanted extras have been included in the release.
 
-8) If everything is working as expected, run `cargo publish`. This will push the new version to
+7) If everything is working as expected, run `cargo publish`. This will push the new version to
    crates.io. Note: this cannot be undone, but you can use `cargo yank` to mark a version as
    unsuitable for use.
 
