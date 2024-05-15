@@ -1,10 +1,11 @@
 [features]
+nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
 
 [package]
 name = "green-kernels"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2021"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 description = "Evaluation of Green's function kernels."
@@ -28,9 +29,11 @@ num = "0.4"
 num_cpus = "1"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 rand = "0.8.5"
-itertools = "0.12"
-pulp = "0.18.12"
-coe-rs = "0.1"
+itertools = { version = "0.12.1", default-features = false }
+coe-rs = "0.1.2"
+pulp = { version = "0.18.12" }
+bytemuck = "1.16.0"
+hexf = "0.2.1"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
@@ -43,12 +46,12 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 wildcard_imports = "forbid"
 
 [target.aarch64-apple-darwin.dev-dependencies]
-blas-src = { version = "0.9", features = ["accelerate"]}
-lapack-src = { version = "0.9", features = ["accelerate"]}
+blas-src = { version = "0.10", features = ["accelerate"]}
+lapack-src = { version = "0.10", features = ["accelerate"]}
 
 [target.x86_64-unknown-linux-gnu.dev-dependencies]
-blas-src = { version = "0.9", features = ["blis"]}
-lapack-src = { version = "0.9", features = ["netlib"]}
+blas-src = { version = "0.10", features = ["blis"]}
+lapack-src = { version = "0.10", features = ["netlib"]}
 
 [[bench]]
 name = "laplace_f32"
