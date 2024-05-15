@@ -1,4 +1,5 @@
 [features]
+nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
 
@@ -28,6 +29,12 @@ num = "0.4"
 num_cpus = "1"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 rand = "0.8.5"
+itertools = { version = "0.12.1", default-features = false }
+coe-rs = "0.1.2"
+pulp = { version = "0.18.12" }
+bytemuck = "1.16.0"
+hexf = "0.2.1"
+
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

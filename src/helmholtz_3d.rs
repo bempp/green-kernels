@@ -4,9 +4,15 @@ use crate::helpers::{
 };
 use crate::traits::Kernel;
 use crate::types::EvalType;
+use crate::RealScalar;
+use crate::{ComplexScalar, SimdFor};
 use num::traits::FloatConst;
+use num::One;
 use num::Zero;
+use pulp::Simd;
 use rayon::prelude::*;
+use rlst::c32;
+use rlst::c64;
 use rlst::RlstScalar;
 use std::marker::PhantomData;
 
@@ -251,8 +257,8 @@ where
 /// Evaluate Helmholtz kernel for one target
 pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     eval_type: EvalType,
-    target: &[<T as RlstScalar>::Real],
-    sources: &[<T as RlstScalar>::Real],
+    target: &[T::Real],
+    sources: &[T::Real],
     charges: &[T],
     wavenumber: T::Real,
     result: &mut [T],
@@ -273,33 +279,159 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result_real = <<T as RlstScalar>::Real as Zero>::zero();
-            let mut my_result_imag = <<T as RlstScalar>::Real as Zero>::zero();
-            for index in 0..nsources {
-                diff0 = sources0[index] - target[0];
-                diff1 = sources1[index] - target[1];
-                diff2 = sources2[index] - target[2];
-                let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-                let inv_diff_norm = {
-                    if diff_norm == zero_real {
-                        zero_real
-                    } else {
-                        one_real / diff_norm
-                    }
-                };
+            struct Impl<'a, T: RlstScalar> {
+                wavenumber: T::Real,
+                t0: T::Real,
+                t1: T::Real,
+                t2: T::Real,
 
-                let kr = wavenumber * diff_norm;
-
-                let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm;
-                let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm;
-                let charge_re = charges[index].re();
-                let charge_im = charges[index].im();
-
-                my_result_imag += g_re * charge_im + g_im * charge_re;
-                my_result_real += g_re * charge_re - g_im * charge_im;
+                sources0: &'a [T::Real],
+                sources1: &'a [T::Real],
+                sources2: &'a [T::Real],
+                charges: &'a [T],
             }
-            result[0] += <T::Complex as RlstScalar>::complex(my_result_real, my_result_imag)
-                .mul_real(m_inv_4pi);
+
+            impl<T: ComplexScalar> pulp::WithSimd for Impl<'_, T> {
+                type Output = (T::Real, T::Real);
+
+                #[inline(always)]
+                fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
+                    use coe::Coerce;
+
+                    let Self {
+                        wavenumber,
+                        t0,
+                        t1,
+                        t2,
+                        sources0,
+                        sources1,
+                        sources2,
+                        charges,
+                    } = self;
+
+                    let (s0_head, s0_tail) = T::Real::as_simd_slice::<S>(sources0);
+                    let (s1_head, s1_tail) = T::Real::as_simd_slice::<S>(sources1);
+                    let (s2_head, s2_tail) = T::Real::as_simd_slice::<S>(sources2);
+
+                    let len = s0_head.len();
+                    let n = std::mem::size_of::<<T::Real as RealScalar>::Scalars<S>>()
+                        / std::mem::size_of::<T::Real>();
+                    let (c_head, c_tail) = charges.split_at(len * n);
+                    let c_head: &[[<T::Real as RealScalar>::Scalars<S>; 2]] =
+                        bytemuck::cast_slice(c_head);
+                    let c_tail: &[[T::Real; 2]] = bytemuck::cast_slice(c_tail);
+
+                    #[inline(always)]
+                    fn impl_slice<T: ComplexScalar, S: Simd>(
+                        simd: S,
+                        wavenumber: T::Real,
+                        t0: T::Real,
+                        t1: T::Real,
+                        t2: T::Real,
+
+                        sources0: &[<T::Real as RealScalar>::Scalars<S>],
+                        sources1: &[<T::Real as RealScalar>::Scalars<S>],
+                        sources2: &[<T::Real as RealScalar>::Scalars<S>],
+                        charges: &[[<T::Real as RealScalar>::Scalars<S>; 2]],
+                    ) -> (T::Real, T::Real) {
+                        let simd = SimdFor::<T::Real, S>::new(simd);
+
+                        let t0 = simd.splat(t0);
+                        let t1 = simd.splat(t1);
+                        let t2 = simd.splat(t2);
+                        let zero = simd.splat(T::Real::zero());
+                        let wavenumber = simd.splat(wavenumber);
+                        let mut acc_re = simd.splat(T::Real::zero());
+                        let mut acc_im = simd.splat(T::Real::zero());
+
+                        for (&s0, &s1, &s2, &c) in
+                            itertools::izip!(sources0, sources1, sources2, charges)
+                        {
+                            let [c_re, c_im] = simd.deinterleave(c);
+
+                            let diff0 = simd.sub(s0, t0);
+                            let diff1 = simd.sub(s1, t1);
+                            let diff2 = simd.sub(s2, t2);
+
+                            let diff_norm = simd.sqrt(simd.mul_add(
+                                diff0,
+                                diff0,
+                                simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
+                            ));
+
+                            let is_zero = simd.cmp_eq(diff_norm, zero);
+                            let inv_diff_norm = simd.select(
+                                is_zero,
+                                zero,
+                                simd.div(simd.splat(T::Real::one()), diff_norm),
+                            );
+                            let kr = simd.mul(wavenumber, diff_norm);
+
+                            let (g_re, g_im) = {
+                                let (s, c) = simd.sin_cos(kr);
+                                (simd.mul(c, inv_diff_norm), simd.mul(s, inv_diff_norm))
+                            };
+
+                            acc_re = simd.mul_add(
+                                g_re,
+                                c_re,
+                                simd.mul_add(simd.neg(g_im), c_im, acc_re),
+                            );
+                            acc_im = simd.mul_add(g_re, c_im, simd.mul_add(g_im, c_re, acc_im));
+                        }
+                        (simd.reduce_add(acc_re), simd.reduce_add(acc_im))
+                    }
+
+                    let (re0, im0) = impl_slice::<T, S>(
+                        simd, wavenumber, t0, t1, t2, s0_head, s1_head, s2_head, c_head,
+                    );
+                    let (re1, im1) = impl_slice::<T, pulp::Scalar>(
+                        pulp::Scalar::new(),
+                        wavenumber,
+                        t0,
+                        t1,
+                        t2,
+                        s0_tail.coerce(),
+                        s1_tail.coerce(),
+                        s2_tail.coerce(),
+                        c_tail.coerce(),
+                    );
+
+                    (re0 + re1, im0 + im1)
+                }
+            }
+
+            use coe::coerce_static as to;
+            use coe::Coerce;
+            if coe::is_same::<T, c32>() {
+                let (re, im) = pulp::Arch::new().dispatch(Impl::<'_, c32> {
+                    wavenumber: to(wavenumber),
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources0: sources0.coerce(),
+                    sources1: sources1.coerce(),
+                    sources2: sources2.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] += T::Complex::complex(to::<_, T::Real>(re), to::<_, T::Real>(im))
+                    .mul_real(m_inv_4pi);
+            } else if coe::is_same::<T, c64>() {
+                let (re, im) = pulp::Arch::new().dispatch(Impl::<'_, c64> {
+                    wavenumber: to(wavenumber),
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources0: sources0.coerce(),
+                    sources1: sources1.coerce(),
+                    sources2: sources2.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] += T::Complex::complex(to::<_, T::Real>(re), to::<_, T::Real>(im))
+                    .mul_real(m_inv_4pi);
+            } else {
+                panic!()
+            }
         }
         EvalType::ValueDeriv => {
             // Cannot simply use an array my_result as this is not
