@@ -4,8 +4,6 @@ use crate::helpers::{
 };
 use crate::traits::Kernel;
 use crate::types::EvalType;
-use crate::RealScalar;
-use crate::{ComplexScalar, SimdFor};
 use num::traits::FloatConst;
 use num::One;
 use num::Zero;
@@ -14,6 +12,7 @@ use rayon::prelude::*;
 use rlst::c32;
 use rlst::c64;
 use rlst::RlstScalar;
+use rlst::{RlstSimd, SimdFor};
 use std::marker::PhantomData;
 
 /// Kernel for Helmholtz in 3D
@@ -279,7 +278,10 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
 
     match eval_type {
         EvalType::Value => {
-            struct Impl<'a, T: RlstScalar> {
+            struct Impl<'a, T: RlstScalar<Complex = T>>
+            where
+                T::Real: RlstSimd,
+            {
                 wavenumber: T::Real,
                 t0: T::Real,
                 t1: T::Real,
@@ -291,7 +293,10 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                 charges: &'a [T],
             }
 
-            impl<T: ComplexScalar> pulp::WithSimd for Impl<'_, T> {
+            impl<T: RlstScalar<Complex = T>> pulp::WithSimd for Impl<'_, T>
+            where
+                T::Real: RlstSimd,
+            {
                 type Output = (T::Real, T::Real);
 
                 #[inline(always)]
@@ -314,26 +319,29 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                     let (s2_head, s2_tail) = T::Real::as_simd_slice::<S>(sources2);
 
                     let len = s0_head.len();
-                    let n = std::mem::size_of::<<T::Real as RealScalar>::Scalars<S>>()
+                    let n = std::mem::size_of::<<T::Real as RlstSimd>::Scalars<S>>()
                         / std::mem::size_of::<T::Real>();
                     let (c_head, c_tail) = charges.split_at(len * n);
-                    let c_head: &[[<T::Real as RealScalar>::Scalars<S>; 2]] =
+                    let c_head: &[[<T::Real as RlstSimd>::Scalars<S>; 2]] =
                         bytemuck::cast_slice(c_head);
                     let c_tail: &[[T::Real; 2]] = bytemuck::cast_slice(c_tail);
 
                     #[inline(always)]
-                    fn impl_slice<T: ComplexScalar, S: Simd>(
+                    fn impl_slice<T: RlstScalar<Complex = T>, S: Simd>(
                         simd: S,
                         wavenumber: T::Real,
                         t0: T::Real,
                         t1: T::Real,
                         t2: T::Real,
 
-                        sources0: &[<T::Real as RealScalar>::Scalars<S>],
-                        sources1: &[<T::Real as RealScalar>::Scalars<S>],
-                        sources2: &[<T::Real as RealScalar>::Scalars<S>],
-                        charges: &[[<T::Real as RealScalar>::Scalars<S>; 2]],
-                    ) -> (T::Real, T::Real) {
+                        sources0: &[<T::Real as RlstSimd>::Scalars<S>],
+                        sources1: &[<T::Real as RlstSimd>::Scalars<S>],
+                        sources2: &[<T::Real as RlstSimd>::Scalars<S>],
+                        charges: &[[<T::Real as RlstSimd>::Scalars<S>; 2]],
+                    ) -> (T::Real, T::Real)
+                    where
+                        T::Real: RlstSimd,
+                    {
                         let simd = SimdFor::<T::Real, S>::new(simd);
 
                         let t0 = simd.splat(t0);

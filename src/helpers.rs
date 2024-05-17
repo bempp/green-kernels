@@ -2,7 +2,8 @@
 
 use crate::traits::Kernel;
 use crate::types::EvalType;
-use rlst::RlstScalar;
+use pulp::Simd;
+use rlst::{RlstScalar, RlstSimd, SimdFor};
 
 pub(crate) fn check_dimensions_evaluate<K: Kernel, T: RlstScalar>(
     kernel: &K,

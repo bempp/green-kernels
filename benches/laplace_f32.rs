@@ -35,7 +35,7 @@ pub fn laplace_f32_test_standard(c: &mut Criterion) {
 
     charges.fill_from_standard_normal(&mut rng);
 
-    c.bench_function("f32 auto vectorized", |b| {
+    c.bench_function("f32 new simd", |b| {
         b.iter(|| {
             Laplace3dKernel::<f32>::new().evaluate_st(
                 EvalType::Value,
@@ -63,7 +63,7 @@ pub fn laplace_f32_test_simd(c: &mut Criterion) {
 
     charges.fill_from_standard_normal(&mut rng);
 
-    c.bench_function("f32 manual simd", |b| {
+    c.bench_function("f32 col major manual simd", |b| {
         b.iter(|| {
             evaluate_laplace_st_simd(
                 EvalType::Value,
@@ -163,9 +163,7 @@ fn evaluate_laplace_st_row_major_simd(
 
         let mut res: [f32; 1] = [0.0];
 
-        evaluate_laplace_one_target_row_major_simd_new(
-            eval_type, &target, sources, charges, &mut res,
-        );
+        evaluate_laplace_one_target(eval_type, &target, sources, charges, &mut res);
         result[index] = res[0];
     }
 }
@@ -310,6 +308,175 @@ pub fn evaluate_laplace_one_target_row_major_simd(
     }
 }
 
+/// Evaluate laplce kernel with one target
+pub fn evaluate_laplace_one_target<T: RlstScalar>(
+    eval_type: EvalType,
+    target: &[<T as RlstScalar>::Real],
+    sources: &[<T as RlstScalar>::Real],
+    charges: &[T],
+    result: &mut [T],
+) {
+    let ncharges = charges.len();
+    let nsources = ncharges;
+    let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
+    let zero_real = <T::Real as num::Zero>::zero();
+    let one_real = <T::Real as num::One>::one();
+
+    let sources0 = &sources[0..nsources];
+    let sources1 = &sources[nsources..2 * nsources];
+    let sources2 = &sources[2 * nsources..3 * nsources];
+
+    let mut diff0: T::Real;
+    let mut diff1: T::Real;
+    let mut diff2: T::Real;
+
+    match eval_type {
+        EvalType::Value => {
+            struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
+                t0: T,
+                t1: T,
+                t2: T,
+
+                sources: &'a [T],
+                charges: &'a [T],
+            }
+
+            impl<T: RlstScalar<Real = T> + RlstSimd> pulp::WithSimd for Impl<'_, T> {
+                type Output = T;
+
+                #[inline(always)]
+                fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
+                    use coe::Coerce;
+
+                    let Self {
+                        t0,
+                        t1,
+                        t2,
+                        sources,
+                        charges,
+                    } = self;
+
+                    let (sources, _) = pulp::as_arrays::<3, T>(sources);
+                    let (sources_head, sources_tail) = T::as_simd_slice_from_vec(sources);
+                    let (charges_head, charges_tail) = T::as_simd_slice(charges);
+
+                    fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
+                        simd: S,
+                        t0: T,
+                        t1: T,
+                        t2: T,
+                        sources: &[[T::Scalars<S>; 3]],
+                        charges: &[T::Scalars<S>],
+                    ) -> T {
+                        let simd = SimdFor::<T, S>::new(simd);
+
+                        let t0 = simd.splat(t0);
+                        let t1 = simd.splat(t1);
+                        let t2 = simd.splat(t2);
+
+                        let zero = simd.splat(T::zero());
+
+                        let mut acc = simd.splat(T::zero());
+
+                        for (&s, &c) in itertools::izip!(sources, charges) {
+                            let [s0, s1, s2] = simd.deinterleave(s);
+
+                            let diff0 = simd.sub(s0, t0);
+                            let diff1 = simd.sub(s1, t1);
+                            let diff2 = simd.sub(s2, t2);
+
+                            let square_sum = simd.mul_add(
+                                diff0,
+                                diff0,
+                                simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
+                            );
+
+                            let is_zero = simd.cmp_eq(square_sum, zero);
+                            let inv_abs =
+                                simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
+
+                            acc = simd.mul_add(inv_abs, c, acc);
+                        }
+
+                        simd.reduce_add(acc)
+                    }
+
+                    let acc0 = impl_slice::<T, S>(simd, t0, t1, t2, sources_head, charges_head);
+                    let acc1 = impl_slice::<T, pulp::Scalar>(
+                        pulp::Scalar::new(),
+                        t0,
+                        t1,
+                        t2,
+                        sources_tail.coerce(),
+                        charges_tail.coerce(),
+                    );
+
+                    acc0 + acc1
+                }
+            }
+
+            use coe::coerce_static as to;
+            use coe::Coerce;
+            if coe::is_same::<T, f32>() {
+                let acc = pulp::Arch::new().dispatch(Impl::<'_, f32> {
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources: sources.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] += T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
+            } else if coe::is_same::<T, f64>() {
+                let acc = pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources: sources.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] += T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
+            } else {
+                panic!()
+            }
+        }
+        EvalType::ValueDeriv => {
+            panic!("Not implemented.")
+            //     // Cannot simply use an array my_result as this is not
+            //     // correctly auto-vectorized.
+
+            //     let mut my_result0 = T::zero();
+            //     let mut my_result1 = T::zero();
+            //     let mut my_result2 = T::zero();
+            //     let mut my_result3 = T::zero();
+
+            //     for index in 0..nsources {
+            //         diff0 = sources0[index] - target[0];
+            //         diff1 = sources1[index] - target[1];
+            //         diff2 = sources2[index] - target[2];
+            //         let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
+            //         let inv_diff_norm = {
+            //             if diff_norm == zero_real {
+            //                 zero_real
+            //             } else {
+            //                 one_real / diff_norm
+            //             }
+            //         };
+            //         let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
+
+            //         my_result0 += charges[index].mul_real(inv_diff_norm);
+            //         my_result1 += charges[index].mul_real(diff0 * inv_diff_norm_cubed);
+            //         my_result2 += charges[index].mul_real(diff1 * inv_diff_norm_cubed);
+            //         my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
+            //     }
+
+            //     result[0] += my_result0.mul_real(m_inv_4pi);
+            //     result[1] += my_result1.mul_real(m_inv_4pi);
+            //     result[2] += my_result2.mul_real(m_inv_4pi);
+            //     result[3] += my_result3.mul_real(m_inv_4pi);
+        }
+    }
+}
+
 pub fn evaluate_laplace_one_target_row_major_simd_new(
     eval_type: EvalType,
     target: &[f32],
@@ -442,9 +609,7 @@ fn fma<T: 'static>(x: T, y: T, z: T) -> T {
 
 criterion_group!(
     benches,
-    laplace_f32_test_simd,
-    laplace_f32_test_row_major_simd,
     laplace_f32_test_standard,
-    laplace_f32_test_by_col
+    laplace_f32_test_row_major_simd,
 );
 criterion_main!(benches);

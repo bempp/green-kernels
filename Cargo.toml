@@ -27,7 +27,7 @@ approx = { version = "0.5", features = ["num-complex"] }
 rayon = "1.9"
 num = "0.4"
 num_cpus = "1"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+rlst = { path = "../rlst" }
 rand = "0.8.5"
 itertools = { version = "0.12.1", default-features = false }
 coe-rs = "0.1.2"

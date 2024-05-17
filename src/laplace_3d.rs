@@ -6,7 +6,7 @@ use crate::traits::Kernel;
 use crate::types::EvalType;
 use num::traits::FloatConst;
 use rayon::prelude::*;
-use rlst::RlstScalar;
+use rlst::{RlstScalar, RlstSimd, SimdFor};
 use std::marker::PhantomData;
 
 /// Kernel for Laplace in 3D
@@ -55,9 +55,9 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
 
                 evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
@@ -81,9 +81,9 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
 
                 evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
@@ -235,57 +235,217 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
 
     match eval_type {
         EvalType::Value => {
-            let mut my_result = T::zero();
-            for index in 0..nsources {
-                diff0 = sources0[index] - target[0];
-                diff1 = sources1[index] - target[1];
-                diff2 = sources2[index] - target[2];
-                let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-                let inv_diff_norm = {
-                    if diff_norm == zero_real {
-                        zero_real
-                    } else {
-                        one_real / diff_norm
-                    }
-                };
+            struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
+                t0: T,
+                t1: T,
+                t2: T,
 
-                my_result += charges[index].mul_real(inv_diff_norm);
+                sources: &'a [T],
+                charges: &'a [T],
             }
-            result[0] += my_result.mul_real(m_inv_4pi);
+
+            impl<T: RlstScalar<Real = T> + RlstSimd> pulp::WithSimd for Impl<'_, T> {
+                type Output = T;
+
+                #[inline(always)]
+                fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
+                    use coe::Coerce;
+
+                    let Self {
+                        t0,
+                        t1,
+                        t2,
+                        sources,
+                        charges,
+                    } = self;
+
+                    let (sources, _) = pulp::as_arrays::<3, T>(sources);
+                    let (sources_head, sources_tail) = T::as_simd_slice_from_vec(sources);
+                    let (charges_head, charges_tail) = T::as_simd_slice(charges);
+
+                    fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
+                        simd: S,
+                        t0: T,
+                        t1: T,
+                        t2: T,
+                        sources: &[[T::Scalars<S>; 3]],
+                        charges: &[T::Scalars<S>],
+                    ) -> T {
+                        let simd = SimdFor::<T, S>::new(simd);
+
+                        let t0 = simd.splat(t0);
+                        let t1 = simd.splat(t1);
+                        let t2 = simd.splat(t2);
+
+                        let zero = simd.splat(T::zero());
+
+                        let mut acc = simd.splat(T::zero());
+
+                        for (&s, &c) in itertools::izip!(sources, charges) {
+                            let [s0, s1, s2] = simd.deinterleave(s);
+
+                            let diff0 = simd.sub(s0, t0);
+                            let diff1 = simd.sub(s1, t1);
+                            let diff2 = simd.sub(s2, t2);
+
+                            let square_sum = simd.mul_add(
+                                diff0,
+                                diff0,
+                                simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
+                            );
+
+                            let is_zero = simd.cmp_eq(square_sum, zero);
+                            let inv_abs =
+                                simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
+
+                            acc = simd.mul_add(inv_abs, c, acc);
+                        }
+
+                        simd.reduce_add(acc)
+                    }
+
+                    let acc0 = impl_slice::<T, S>(simd, t0, t1, t2, sources_head, charges_head);
+                    let acc1 = impl_slice::<T, pulp::Scalar>(
+                        pulp::Scalar::new(),
+                        t0,
+                        t1,
+                        t2,
+                        sources_tail.coerce(),
+                        charges_tail.coerce(),
+                    );
+
+                    acc0 + acc1
+                }
+            }
+
+            use coe::coerce_static as to;
+            use coe::Coerce;
+            if coe::is_same::<T, f32>() {
+                let acc = pulp::Arch::new().dispatch(Impl::<'_, f32> {
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources: sources.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] += T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
+            } else if coe::is_same::<T, f64>() {
+                let acc = pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources: sources.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] += T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
+            } else {
+                panic!()
+            }
         }
         EvalType::ValueDeriv => {
-            // Cannot simply use an array my_result as this is not
-            // correctly auto-vectorized.
+            panic!("Not implemented.")
+            //     // Cannot simply use an array my_result as this is not
+            //     // correctly auto-vectorized.
 
-            let mut my_result0 = T::zero();
-            let mut my_result1 = T::zero();
-            let mut my_result2 = T::zero();
-            let mut my_result3 = T::zero();
+            //     let mut my_result0 = T::zero();
+            //     let mut my_result1 = T::zero();
+            //     let mut my_result2 = T::zero();
+            //     let mut my_result3 = T::zero();
 
-            for index in 0..nsources {
-                diff0 = sources0[index] - target[0];
-                diff1 = sources1[index] - target[1];
-                diff2 = sources2[index] - target[2];
-                let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-                let inv_diff_norm = {
-                    if diff_norm == zero_real {
-                        zero_real
-                    } else {
-                        one_real / diff_norm
-                    }
-                };
-                let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
+            //     for index in 0..nsources {
+            //         diff0 = sources0[index] - target[0];
+            //         diff1 = sources1[index] - target[1];
+            //         diff2 = sources2[index] - target[2];
+            //         let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
+            //         let inv_diff_norm = {
+            //             if diff_norm == zero_real {
+            //                 zero_real
+            //             } else {
+            //                 one_real / diff_norm
+            //             }
+            //         };
+            //         let inv_diff_norm_cubed = inv_diff_norm * inv_diff_norm * inv_diff_norm;
 
-                my_result0 += charges[index].mul_real(inv_diff_norm);
-                my_result1 += charges[index].mul_real(diff0 * inv_diff_norm_cubed);
-                my_result2 += charges[index].mul_real(diff1 * inv_diff_norm_cubed);
-                my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
+            //         my_result0 += charges[index].mul_real(inv_diff_norm);
+            //         my_result1 += charges[index].mul_real(diff0 * inv_diff_norm_cubed);
+            //         my_result2 += charges[index].mul_real(diff1 * inv_diff_norm_cubed);
+            //         my_result3 += charges[index].mul_real(diff2 * inv_diff_norm_cubed);
+            //     }
+
+            //     result[0] += my_result0.mul_real(m_inv_4pi);
+            //     result[1] += my_result1.mul_real(m_inv_4pi);
+            //     result[2] += my_result2.mul_real(m_inv_4pi);
+            //     result[3] += my_result3.mul_real(m_inv_4pi);
+        }
+    }
+}
+
+pub fn evaluate_laplace_one_target_f32(
+    eval_type: EvalType,
+    target: &[f32],
+    sources: &[f32],
+    charges: &[f32],
+    result: &mut [f32],
+) {
+    evaluate_laplace_one_target(eval_type, target, sources, charges, result);
+}
+
+/// Evaluate laplce kernel with one target
+pub fn evaluate_laplace_one_target_row_major_simd(
+    eval_type: EvalType,
+    target: &[f32],
+    sources: &[f32],
+    charges: &[f32],
+    result: &mut [f32],
+) {
+    let ncharges = charges.len();
+    let nsources = ncharges;
+    let m_inv_4pi = 0.25 * f32::FRAC_1_PI();
+
+    // let sources0 = &sources[0..nsources];
+    // let sources1 = &sources[nsources..2 * nsources];
+    // let sources2 = &sources[2 * nsources..3 * nsources];
+
+    match eval_type {
+        EvalType::Value => {
+            for chunk_start in (0..nsources).step_by(4) {
+                use core::arch::aarch64;
+                unsafe {
+                    let zero = aarch64::vdupq_n_f32(0.0);
+                    let aarch64::float32x4x3_t(source_x, source_y, source_z) =
+                        aarch64::vld3q_f32(&sources[chunk_start]);
+
+                    let charge = aarch64::vld1q_dup_f32(&charges[chunk_start]);
+
+                    let target_x: aarch64::float32x4_t = aarch64::vdupq_n_f32(target[0]);
+                    let target_y: aarch64::float32x4_t = aarch64::vdupq_n_f32(target[1]);
+                    let target_z: aarch64::float32x4_t = aarch64::vdupq_n_f32(target[2]);
+
+                    let diff_x = aarch64::vsubq_f32(target_x, source_x);
+                    let diff_y = aarch64::vsubq_f32(target_y, source_y);
+                    let diff_z = aarch64::vsubq_f32(target_z, source_z);
+
+                    let diff_sq_x = aarch64::vmulq_f32(diff_x, diff_x);
+                    let diff_sq_y = aarch64::vmulq_f32(diff_y, diff_y);
+                    let diff_sq_z = aarch64::vmulq_f32(diff_z, diff_z);
+
+                    let sum =
+                        aarch64::vaddq_f32(aarch64::vaddq_f32(diff_sq_x, diff_sq_y), diff_sq_z);
+
+                    let greater_zero = aarch64::vcgtq_f32(sum, zero);
+
+                    let filtered_inv_sqrt =
+                        aarch64::vbslq_f32(greater_zero, aarch64::vrsqrteq_f32(sum), zero);
+
+                    let prod = aarch64::vmulq_n_f32(filtered_inv_sqrt, m_inv_4pi);
+
+                    let prod_with_charge = aarch64::vmulq_f32(prod, charge);
+                    result[0] += aarch64::vaddvq_f32(prod_with_charge);
+                }
             }
-
-            result[0] += my_result0.mul_real(m_inv_4pi);
-            result[1] += my_result1.mul_real(m_inv_4pi);
-            result[2] += my_result2.mul_real(m_inv_4pi);
-            result[3] += my_result3.mul_real(m_inv_4pi);
+        }
+        EvalType::ValueDeriv => {
+            panic!("Not supported");
         }
     }
 }
@@ -390,6 +550,7 @@ mod test {
     use super::*;
     use approx::assert_relative_eq;
     use rand::prelude::*;
+
     use rlst::{
         rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray, RandomAccessByRef,
         RandomAccessMut, RawAccess, RawAccessMut, Shape, VectorContainer,
@@ -428,11 +589,44 @@ mod test {
     }
 
     #[test]
-    fn test_laplace_3d() {
-        let eps = 1E-8;
+    fn test_laplace_3d_value() {
+        let nsources = 9;
+        let ntargets = 2;
 
-        let nsources = 5;
-        let ntargets = 3;
+        let sources = rand_mat([3, nsources]);
+        let targets = rand_mat([3, ntargets]);
+        let charges = rand_vec(nsources);
+        let mut green_value = rlst_dynamic_array2!(f64, [1, ntargets]);
+
+        Laplace3dKernel::<f64>::default().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            charges.data(),
+            green_value.data_mut(),
+        );
+
+        for target_index in 0..ntargets {
+            let mut expected: f64 = 0.0;
+            for source_index in 0..nsources {
+                let dist = ((targets[[0, target_index]] - sources[[0, source_index]]).square()
+                    + (targets[[1, target_index]] - sources[[1, source_index]]).square()
+                    + (targets[[2, target_index]] - sources[[2, source_index]]).square())
+                .sqrt();
+
+                expected += charges[[source_index, 0]] * 0.25 * f64::FRAC_1_PI() / dist;
+            }
+
+            assert_relative_eq!(green_value[[0, target_index]], expected, epsilon = 1E-12);
+        }
+    }
+
+    #[test]
+    fn test_laplace_3d() {
+        let eps: f64 = 1E-8;
+
+        let nsources = 2;
+        let ntargets = 1;
 
         let sources = rand_mat([nsources, 3]);
         let targets = rand_mat([ntargets, 3]);
