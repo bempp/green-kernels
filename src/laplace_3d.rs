@@ -1190,6 +1190,12 @@ mod test {
 
             for deriv_index in 0..4 {
                 for target_index in 0..ntargets {
+                    println!("Deriv Index: {:#?}", deriv_index);
+                    println!(
+                        "Actual value: {:#?}",
+                        green_value_deriv[[4 * target_index + deriv_index, charge_index]]
+                    );
+                    println!("Expected: {:#?}", expected[[deriv_index, target_index]]);
                     assert_relative_eq!(
                         green_value_deriv[[4 * target_index + deriv_index, charge_index]],
                         expected[[deriv_index, target_index]],
