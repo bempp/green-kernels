@@ -722,11 +722,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                             r[2] = simd.mul(diff1, simd.mul(inv_abs_cube, m_inv_4pi));
                             r[3] = simd.mul(diff2, simd.mul(inv_abs_cube, m_inv_4pi));
 
-                            println!("Before interleave {:#?}", r);
-
                             *r = simd.interleave(*r);
-
-                            println!("After interleave {:#?}", r);
                         }
                     }
 
@@ -1112,18 +1108,16 @@ mod test {
 
     #[test]
     fn test_assemble_laplace_3d() {
-        let nsources = 2;
-        let ntargets = 2;
+        let nsources = 3;
+        let ntargets = 1;
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
         let mut sources = rlst_dynamic_array2!(f64, [3, nsources]);
         let mut targets = rlst_dynamic_array2!(f64, [3, ntargets]);
-        let mut charges = rlst_dynamic_array1!(f64, [nsources]);
         let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
 
-        sources.fill_from_equally_distributed(&mut rng);
         targets.fill_from_equally_distributed(&mut rng);
-        charges.fill_from_equally_distributed(&mut rng);
+        sources.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::Value,
@@ -1160,19 +1154,16 @@ mod test {
             }
         }
 
-        let mut green_value_deriv_t = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,
             sources.data(),
             targets.data(),
-            green_value_deriv_t.data_mut(),
+            green_value_deriv.data_mut(),
         );
 
         // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
-
-        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
-        green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
         for charge_index in 0..nsources {
             let mut charges = rlst_dynamic_array1![f64, [nsources]];
@@ -1190,12 +1181,6 @@ mod test {
 
             for deriv_index in 0..4 {
                 for target_index in 0..ntargets {
-                    println!("Deriv Index: {:#?}", deriv_index);
-                    println!(
-                        "Actual value: {:#?}",
-                        green_value_deriv[[4 * target_index + deriv_index, charge_index]]
-                    );
-                    println!("Expected: {:#?}", expected[[deriv_index, target_index]]);
                     assert_relative_eq!(
                         green_value_deriv[[4 * target_index + deriv_index, charge_index]],
                         expected[[deriv_index, target_index]],
