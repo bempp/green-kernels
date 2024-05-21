@@ -96,7 +96,6 @@ where
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
-        let ntargets = targets.len() / self.space_dimension();
         let nsources = sources.len() / self.space_dimension();
         let range_dim = self.range_component_count(eval_type);
 
@@ -122,7 +121,6 @@ where
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble(self, eval_type, sources, targets, result);
-        let ntargets = targets.len() / self.space_dimension();
         let nsources = sources.len() / self.space_dimension();
         let range_dim = self.range_component_count(eval_type);
 
@@ -148,7 +146,6 @@ where
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble_diagonal(self, eval_type, sources, targets, result);
-        let ntargets = targets.len() / self.space_dimension();
         let range_dim = self.range_component_count(eval_type);
 
         result
@@ -156,14 +153,14 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
                 let source = [
-                    sources[target_index],
-                    sources[ntargets + target_index],
-                    sources[2 * ntargets + target_index],
+                    sources[3 * target_index],
+                    sources[3 * target_index + 1],
+                    sources[3 * target_index + 2],
                 ];
                 self.greens_fct(eval_type, &source, &target, my_chunk)
             });
@@ -635,7 +632,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                     result: result.coerce(),
                 });
             } else if coe::is_same::<T, f64>() {
-                let acc = pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                pulp::Arch::new().dispatch(Impl::<'_, f64> {
                     m_inv_4pi: to(m_inv_4pi),
                     t0: to(target[0]),
                     t1: to(target[1]),
@@ -780,7 +777,7 @@ mod test {
     use super::*;
     use approx::assert_relative_eq;
     use rand::prelude::*;
-    use rlst::{assert_array_relative_eq, prelude::*};
+    use rlst::prelude::*;
 
     use rlst::{rlst_dynamic_array1, rlst_dynamic_array2};
 
@@ -1191,109 +1188,89 @@ mod test {
         }
     }
 
-    //     #[test]
-    //     fn test_compare_assemble_with_direct_computation() {
-    //         let nsources = 3;
-    //         let ntargets = 5;
+    #[test]
+    fn test_assemble_diag_laplace_3d() {
+        let nsources = 19;
+        let ntargets = 19;
 
-    //         let sources = rand_mat([nsources, 3]);
-    //         let targets = rand_mat([ntargets, 3]);
-    //         let mut green_value_deriv = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
+        let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
+        let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
 
-    //         Laplace3dKernel::<f64>::default().assemble_st(
-    //             EvalType::ValueDeriv,
-    //             sources.data(),
-    //             targets.data(),
-    //             green_value_deriv.data_mut(),
-    //         );
-    //     }
+        sources.fill_from_seed_equally_distributed(1);
+        targets.fill_from_seed_equally_distributed(2);
 
-    //     #[test]
-    //     fn test_assemble_diag_laplace_3d() {
-    //         let nsources = 5;
-    //         let ntargets = 5;
+        let mut green_value_diag = rlst_dynamic_array1!(f64, [ntargets]);
+        let mut green_value_diag_deriv = rlst_dynamic_array2!(f64, [4, ntargets]);
 
-    //         let mut sources = rlst_dynamic_array2!(f64, [nsources, 3]);
-    //         let mut targets = rlst_dynamic_array2!(f64, [ntargets, 3]);
+        Laplace3dKernel::<f64>::default().assemble_diagonal_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_diag.data_mut(),
+        );
+        Laplace3dKernel::<f64>::default().assemble_diagonal_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_diag_deriv.data_mut(),
+        );
 
-    //         sources.fill_from_seed_equally_distributed(1);
-    //         targets.fill_from_seed_equally_distributed(2);
+        let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
 
-    //         let mut green_value_diag = rlst_dynamic_array1!(f64, [ntargets]);
-    //         let mut green_value_diag_deriv = rlst_dynamic_array2!(f64, [4, ntargets]);
+        Laplace3dKernel::<f64>::default().assemble_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_t.data_mut(),
+        );
 
-    //         Laplace3dKernel::<f64>::default().assemble_diagonal_st(
-    //             EvalType::Value,
-    //             sources.data(),
-    //             targets.data(),
-    //             green_value_diag.data_mut(),
-    //         );
-    //         Laplace3dKernel::<f64>::default().assemble_diagonal_st(
-    //             EvalType::ValueDeriv,
-    //             sources.data(),
-    //             targets.data(),
-    //             green_value_diag_deriv.data_mut(),
-    //         );
+        // The matrix needs to be transposed so that the first row corresponds to the first target,
+        // second row to the second target and so on.
 
-    //         let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
+        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
+        green_value.fill_from(green_value_t.transpose());
 
-    //         Laplace3dKernel::<f64>::default().assemble_st(
-    //             EvalType::Value,
-    //             sources.data(),
-    //             targets.data(),
-    //             green_value_t.data_mut(),
-    //         );
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
 
-    //         // The matrix needs to be transposed so that the first row corresponds to the first target,
-    //         // second row to the second target and so on.
+        Laplace3dKernel::<f64>::default().assemble_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_deriv.data_mut(),
+        );
 
-    //         let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
-    //         green_value.fill_from(green_value_t.transpose());
+        // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-    //         let mut green_value_deriv_t = rlst_dynamic_array2!(f64, [nsources, 4 * ntargets]);
+        for index in 0..nsources {
+            assert_relative_eq!(
+                green_value[[index, index]],
+                green_value_diag[[index]],
+                epsilon = 1E-12
+            );
 
-    //         Laplace3dKernel::<f64>::default().assemble_st(
-    //             EvalType::ValueDeriv,
-    //             sources.data(),
-    //             targets.data(),
-    //             green_value_deriv_t.data_mut(),
-    //         );
+            assert_relative_eq!(
+                green_value_deriv[[4 * index, index]],
+                green_value_diag_deriv[[0, index]],
+                epsilon = 1E-12,
+            );
 
-    //         // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 1, index]],
+                green_value_diag_deriv[[1, index]],
+                epsilon = 1E-12,
+            );
 
-    //         let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
-    //         green_value_deriv.fill_from(green_value_deriv_t.transpose());
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 2, index]],
+                green_value_diag_deriv[[2, index]],
+                epsilon = 1E-12,
+            );
 
-    //         for index in 0..nsources {
-    //             assert_relative_eq!(
-    //                 green_value[[index, index]],
-    //                 green_value_diag[[index]],
-    //                 epsilon = 1E-12
-    //             );
-
-    //             assert_relative_eq!(
-    //                 green_value_deriv[[4 * index, index]],
-    //                 green_value_diag_deriv[[0, index]],
-    //                 epsilon = 1E-12,
-    //             );
-
-    //             assert_relative_eq!(
-    //                 green_value_deriv[[4 * index + 1, index]],
-    //                 green_value_diag_deriv[[1, index]],
-    //                 epsilon = 1E-12,
-    //             );
-
-    //             assert_relative_eq!(
-    //                 green_value_deriv[[4 * index + 2, index]],
-    //                 green_value_diag_deriv[[2, index]],
-    //                 epsilon = 1E-12,
-    //             );
-
-    //             assert_relative_eq!(
-    //                 green_value_deriv[[4 * index + 3, index]],
-    //                 green_value_diag_deriv[[3, index]],
-    //                 epsilon = 1E-12,
-    //             );
-    //         }
-    //     }
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 3, index]],
+                green_value_diag_deriv[[3, index]],
+                epsilon = 1E-12,
+            );
+        }
+    }
 }
