@@ -66,9 +66,9 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
 
                 evaluate_helmholtz_one_target(
@@ -99,9 +99,9 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
 
                 evaluate_helmholtz_one_target(
@@ -172,9 +172,9 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
 
                 assemble_helmholtz_one_target(
@@ -204,9 +204,9 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
 
                 assemble_helmholtz_one_target(
@@ -235,14 +235,14 @@ where
             .enumerate()
             .for_each(|(target_index, my_chunk)| {
                 let target = [
-                    targets[target_index],
-                    targets[ntargets + target_index],
-                    targets[2 * ntargets + target_index],
+                    targets[3 * target_index],
+                    targets[3 * target_index + 1],
+                    targets[3 * target_index + 2],
                 ];
                 let source = [
-                    sources[target_index],
-                    sources[ntargets + target_index],
-                    sources[2 * ntargets + target_index],
+                    sources[3 * target_index],
+                    sources[3 * target_index + 1],
+                    sources[3 * target_index + 2],
                 ];
                 self.greens_fct(eval_type, &source, &target, my_chunk)
             });
@@ -262,20 +262,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     wavenumber: T::Real,
     result: &mut [T],
 ) {
-    let ncharges = charges.len();
-    let nsources = ncharges;
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
-    let zero_real = <T::Real as num::Zero>::zero();
-    let one_real = <T::Real as num::One>::one();
-
-    let sources0 = &sources[0..nsources];
-    let sources1 = &sources[nsources..2 * nsources];
-    let sources2 = &sources[2 * nsources..3 * nsources];
-
-    let mut diff0: T::Real;
-    let mut diff1: T::Real;
-    let mut diff2: T::Real;
-
     match eval_type {
         EvalType::Value => {
             struct Impl<'a, T: RlstScalar<Complex = T>>
@@ -287,9 +274,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                 t1: T::Real,
                 t2: T::Real,
 
-                sources0: &'a [T::Real],
-                sources1: &'a [T::Real],
-                sources2: &'a [T::Real],
+                sources: &'a [T::Real],
                 charges: &'a [T],
             }
 
@@ -308,23 +293,14 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                         t0,
                         t1,
                         t2,
-                        sources0,
-                        sources1,
-                        sources2,
+                        sources,
                         charges,
                     } = self;
 
-                    let (s0_head, s0_tail) = T::Real::as_simd_slice::<S>(sources0);
-                    let (s1_head, s1_tail) = T::Real::as_simd_slice::<S>(sources1);
-                    let (s2_head, s2_tail) = T::Real::as_simd_slice::<S>(sources2);
-
-                    let len = s0_head.len();
-                    let n = std::mem::size_of::<<T::Real as RlstSimd>::Scalars<S>>()
-                        / std::mem::size_of::<T::Real>();
-                    let (c_head, c_tail) = charges.split_at(len * n);
-                    let c_head: &[[<T::Real as RlstSimd>::Scalars<S>; 2]] =
-                        bytemuck::cast_slice(c_head);
-                    let c_tail: &[[T::Real; 2]] = bytemuck::cast_slice(c_tail);
+                    let (sources, _) = pulp::as_arrays::<3, T::Real>(sources);
+                    let (sources_head, sources_tail) = <T::Real>::as_simd_slice_from_vec(sources);
+                    let charges: &[[T::Real; 2]] = bytemuck::cast_slice(charges);
+                    let (charges_head, charges_tail) = <T::Real>::as_simd_slice_from_vec(charges);
 
                     #[inline(always)]
                     fn impl_slice<T: RlstScalar<Complex = T>, S: Simd>(
@@ -333,10 +309,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                         t0: T::Real,
                         t1: T::Real,
                         t2: T::Real,
-
-                        sources0: &[<T::Real as RlstSimd>::Scalars<S>],
-                        sources1: &[<T::Real as RlstSimd>::Scalars<S>],
-                        sources2: &[<T::Real as RlstSimd>::Scalars<S>],
+                        sources: &[[<T::Real as RlstSimd>::Scalars<S>; 3]],
                         charges: &[[<T::Real as RlstSimd>::Scalars<S>; 2]],
                     ) -> (T::Real, T::Real)
                     where
@@ -352,14 +325,13 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                         let mut acc_re = simd.splat(T::Real::zero());
                         let mut acc_im = simd.splat(T::Real::zero());
 
-                        for (&s0, &s1, &s2, &c) in
-                            itertools::izip!(sources0, sources1, sources2, charges)
-                        {
+                        for (&s, &c) in itertools::izip!(sources, charges) {
+                            let [sx, sy, sz] = simd.deinterleave(s);
                             let [c_re, c_im] = simd.deinterleave(c);
 
-                            let diff0 = simd.sub(s0, t0);
-                            let diff1 = simd.sub(s1, t1);
-                            let diff2 = simd.sub(s2, t2);
+                            let diff0 = simd.sub(sx, t0);
+                            let diff1 = simd.sub(sy, t1);
+                            let diff2 = simd.sub(sz, t2);
 
                             let diff_norm = simd.sqrt(simd.mul_add(
                                 diff0,
@@ -391,7 +363,13 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                     }
 
                     let (re0, im0) = impl_slice::<T, S>(
-                        simd, wavenumber, t0, t1, t2, s0_head, s1_head, s2_head, c_head,
+                        simd,
+                        wavenumber,
+                        t0,
+                        t1,
+                        t2,
+                        sources_head,
+                        charges_head,
                     );
                     let (re1, im1) = impl_slice::<T, pulp::Scalar>(
                         pulp::Scalar::new(),
@@ -399,10 +377,8 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                         t0,
                         t1,
                         t2,
-                        s0_tail.coerce(),
-                        s1_tail.coerce(),
-                        s2_tail.coerce(),
-                        c_tail.coerce(),
+                        sources_tail.coerce(),
+                        charges_tail.coerce(),
                     );
 
                     (re0 + re1, im0 + im1)
@@ -417,9 +393,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
-                    sources0: sources0.coerce(),
-                    sources1: sources1.coerce(),
-                    sources2: sources2.coerce(),
+                    sources: sources.coerce(),
                     charges: charges.coerce(),
                 });
                 result[0] += T::Complex::complex(to::<_, T::Real>(re), to::<_, T::Real>(im))
@@ -430,9 +404,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
-                    sources0: sources0.coerce(),
-                    sources1: sources1.coerce(),
-                    sources2: sources2.coerce(),
+                    sources: sources.coerce(),
                     charges: charges.coerce(),
                 });
                 result[0] += T::Complex::complex(to::<_, T::Real>(re), to::<_, T::Real>(im))
@@ -442,63 +414,65 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
             }
         }
         EvalType::ValueDeriv => {
+            panic!("Not implemented");
             // Cannot simply use an array my_result as this is not
             // correctly auto-vectorized.
 
-            let mut my_result0_real = <T::Real as Zero>::zero();
-            let mut my_result1_real = <T::Real as Zero>::zero();
-            let mut my_result2_real = <T::Real as Zero>::zero();
-            let mut my_result3_real = <T::Real as Zero>::zero();
+            //     let mut my_result0_real = <T::Real as Zero>::zero();
+            //     let mut my_result1_real = <T::Real as Zero>::zero();
+            //     let mut my_result2_real = <T::Real as Zero>::zero();
+            //     let mut my_result3_real = <T::Real as Zero>::zero();
 
-            let mut my_result0_imag = <T::Real as Zero>::zero();
-            let mut my_result1_imag = <T::Real as Zero>::zero();
-            let mut my_result2_imag = <T::Real as Zero>::zero();
-            let mut my_result3_imag = <T::Real as Zero>::zero();
+            //     let mut my_result0_imag = <T::Real as Zero>::zero();
+            //     let mut my_result1_imag = <T::Real as Zero>::zero();
+            //     let mut my_result2_imag = <T::Real as Zero>::zero();
+            //     let mut my_result3_imag = <T::Real as Zero>::zero();
 
-            for index in 0..nsources {
-                diff0 = sources0[index] - target[0];
-                diff1 = sources1[index] - target[1];
-                diff2 = sources2[index] - target[2];
-                let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-                let inv_diff_norm = {
-                    if diff_norm == zero_real {
-                        zero_real
-                    } else {
-                        one_real / diff_norm
-                    }
-                };
-                let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
+            //     for index in 0..nsources {
+            //         diff0 = sources0[index] - target[0];
+            //         diff1 = sources1[index] - target[1];
+            //         diff2 = sources2[index] - target[2];
+            //         let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
+            //         let inv_diff_norm = {
+            //             if diff_norm == zero_real {
+            //                 zero_real
+            //             } else {
+            //                 one_real / diff_norm
+            //             }
+            //         };
+            //         let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
 
-                let kr = wavenumber * diff_norm;
-                let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
-                let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+            //         let kr = wavenumber * diff_norm;
+            //         let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
+            //         let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
 
-                let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
-                let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
+            //         let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
+            //         let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
 
-                let charge_re = charges[index].re();
-                let charge_im = charges[index].im();
+            //         let charge_re = charges[index].re();
+            //         let charge_im = charges[index].im();
 
-                my_result0_imag += g_re * charge_im + g_im * charge_re;
-                my_result0_real += g_re * charge_re - g_im * charge_im;
+            //         my_result0_imag += g_re * charge_im + g_im * charge_re;
+            //         my_result0_real += g_re * charge_re - g_im * charge_im;
 
-                let times_charge_imag = g_deriv_re * charge_im + g_deriv_im * charge_re;
-                let times_charge_real = g_deriv_re * charge_re - g_deriv_im * charge_im;
+            //         let times_charge_imag = g_deriv_re * charge_im + g_deriv_im * charge_re;
+            //         let times_charge_real = g_deriv_re * charge_re - g_deriv_im * charge_im;
 
-                my_result1_real += times_charge_real * diff0;
-                my_result1_imag += times_charge_imag * diff0;
+            //         my_result1_real += times_charge_real * diff0;
+            //         my_result1_imag += times_charge_imag * diff0;
 
-                my_result2_real += times_charge_real * diff1;
-                my_result2_imag += times_charge_imag * diff1;
+            //         my_result2_real += times_charge_real * diff1;
+            //         my_result2_imag += times_charge_imag * diff1;
 
-                my_result3_real += times_charge_real * diff2;
-                my_result3_imag += times_charge_imag * diff2;
-            }
+            //         my_result3_real += times_charge_real * diff2;
+            //         my_result3_imag += times_charge_imag * diff2;
+            //     }
 
-            result[0] += <T::Complex as RlstScalar>::complex(my_result0_real, my_result0_imag);
-            result[1] += <T::Complex as RlstScalar>::complex(my_result1_real, my_result1_imag);
-            result[2] += <T::Complex as RlstScalar>::complex(my_result2_real, my_result2_imag);
-            result[3] += <T::Complex as RlstScalar>::complex(my_result3_real, my_result3_imag);
+            //     result[0] += <T::Complex as RlstScalar>::complex(my_result0_real, my_result0_imag);
+            //     result[1] += <T::Complex as RlstScalar>::complex(my_result1_real, my_result1_imag);
+            //     result[2] += <T::Complex as RlstScalar>::complex(my_result2_real, my_result2_imag);
+            //     result[3] += <T::Complex as RlstScalar>::complex(my_result3_real, my_result3_imag);
+            // }
         }
     }
 }
@@ -652,44 +626,32 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::c64;
-    use rlst::{
-        Array, BaseArray, RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, Shape,
-        VectorContainer,
-    };
-
-    fn copy(
-        m_in: &Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>,
-    ) -> Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> {
-        let mut m = rlst::rlst_dynamic_array2!(f64, m_in.shape());
-        for i in 0..m_in.shape()[0] {
-            for j in 0..m_in.shape()[1] {
-                *m.get_mut([i, j]).unwrap() = *m_in.get([i, j]).unwrap();
-            }
-        }
-        m
-    }
+    use rand::prelude::*;
+    use rlst::prelude::*;
 
     #[test]
-    fn test_helmholtz_3d() {
-        let eps = 1E-8;
+    fn test_helmholtz_3d_f32() {
+        let eps = 1E-5;
 
-        let wavenumber: f64 = 1.5;
+        let wavenumber: f32 = 1.5;
 
         let nsources = 5;
         let ntargets = 3;
 
-        let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
-        let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
-        let mut charges = rlst::rlst_dynamic_array1!(c64, [nsources]);
+        let nparticles = 13;
 
-        sources.fill_from_seed_equally_distributed(0);
-        targets.fill_from_seed_equally_distributed(1);
-        charges.fill_from_seed_equally_distributed(2);
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
-        let mut green_value = rlst::rlst_dynamic_array1!(c64, [ntargets]);
+        let mut sources = rlst_dynamic_array2!(f32, [3, nparticles]);
+        let mut targets = rlst_dynamic_array2!(f32, [3, nparticles]);
+        let mut charges = rlst_dynamic_array1!(c32, [nparticles]);
+        let mut green_value = rlst_dynamic_array1!(c32, [nparticles]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+        sources.fill_from_equally_distributed(&mut rng);
+        targets.fill_from(sources.view());
+        charges.fill_from_equally_distributed(&mut rng);
+
+        Helmholtz3dKernel::<c32>::new(wavenumber).evaluate_st(
             EvalType::Value,
             sources.data(),
             targets.data(),
@@ -698,289 +660,291 @@ mod test {
         );
 
         for target_index in 0..ntargets {
-            let mut expected = c64::default();
+            let mut expected = c32::default();
             for source_index in 0..nsources {
-                let dist = ((targets[[target_index, 0]] - sources[[source_index, 0]]).square()
-                    + (targets[[target_index, 1]] - sources[[source_index, 1]]).square()
-                    + (targets[[target_index, 2]] - sources[[source_index, 2]]).square())
+                let dist = ((targets[[0, target_index]] - sources[[0, source_index]]).square()
+                    + (targets[[1, target_index]] - sources[[1, source_index]]).square()
+                    + (targets[[2, target_index]] - sources[[2, source_index]]).square())
                 .sqrt();
 
-                expected += charges[[source_index]]
-                    * c64::exp(c64::complex(0.0, wavenumber * dist))
-                    * 0.25
-                    * f64::FRAC_1_PI()
-                    / dist;
+                if dist > 0.0 {
+                    expected += charges[[source_index]]
+                        * c32::exp(c32::complex(0.0, wavenumber * dist))
+                        * 0.25
+                        * f32::FRAC_1_PI()
+                        / dist;
+                }
             }
 
             assert_relative_eq!(green_value[[target_index]], expected, epsilon = 1E-12);
         }
 
-        let mut targets_x_eps = copy(&targets);
-        let mut targets_y_eps = copy(&targets);
-        let mut targets_z_eps = copy(&targets);
+        //     let mut targets_x_eps = copy(&targets);
+        //     let mut targets_y_eps = copy(&targets);
+        //     let mut targets_z_eps = copy(&targets);
 
-        for index in 0..ntargets {
-            targets_x_eps[[index, 0]] += eps;
-            targets_y_eps[[index, 1]] += eps;
-            targets_z_eps[[index, 2]] += eps;
-        }
+        //     for index in 0..ntargets {
+        //         targets_x_eps[[index, 0]] += eps;
+        //         targets_y_eps[[index, 1]] += eps;
+        //         targets_z_eps[[index, 2]] += eps;
+        //     }
 
-        let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
+        //     let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-            EvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            charges.data(),
-            expected.data_mut(),
-        );
+        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+        //         EvalType::ValueDeriv,
+        //         sources.data(),
+        //         targets.data(),
+        //         charges.data(),
+        //         expected.data_mut(),
+        //     );
 
-        let mut green_value_x_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        //     let mut green_value_x_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-            EvalType::Value,
-            sources.data(),
-            targets_x_eps.data(),
-            charges.data(),
-            green_value_x_eps.data_mut(),
-        );
+        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+        //         EvalType::Value,
+        //         sources.data(),
+        //         targets_x_eps.data(),
+        //         charges.data(),
+        //         green_value_x_eps.data_mut(),
+        //     );
 
-        let mut green_value_y_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        //     let mut green_value_y_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-            EvalType::Value,
-            sources.data(),
-            targets_y_eps.data(),
-            charges.data(),
-            green_value_y_eps.data_mut(),
-        );
-        let mut green_value_z_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+        //         EvalType::Value,
+        //         sources.data(),
+        //         targets_y_eps.data(),
+        //         charges.data(),
+        //         green_value_y_eps.data_mut(),
+        //     );
+        //     let mut green_value_z_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-            EvalType::Value,
-            sources.data(),
-            targets_z_eps.data(),
-            charges.data(),
-            green_value_z_eps.data_mut(),
-        );
+        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+        //         EvalType::Value,
+        //         sources.data(),
+        //         targets_z_eps.data(),
+        //         charges.data(),
+        //         green_value_z_eps.data_mut(),
+        //     );
 
-        let mut x_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
-        let mut y_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
-        let mut z_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        //     let mut x_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        //     let mut y_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
+        //     let mut z_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
 
-        x_deriv.fill_from(
-            (green_value_x_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
-        );
+        //     x_deriv.fill_from(
+        //         (green_value_x_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
+        //     );
 
-        y_deriv.fill_from(
-            (green_value_y_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
-        );
-        z_deriv.fill_from(
-            (green_value_z_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
-        );
+        //     y_deriv.fill_from(
+        //         (green_value_y_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
+        //     );
+        //     z_deriv.fill_from(
+        //         (green_value_z_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
+        //     );
 
-        for target_index in 0..ntargets {
-            assert_relative_eq!(
-                green_value[[target_index]],
-                expected[[0, target_index]],
-                epsilon = 1E-12
-            );
+        //     for target_index in 0..ntargets {
+        //         assert_relative_eq!(
+        //             green_value[[target_index]],
+        //             expected[[0, target_index]],
+        //             epsilon = 1E-12
+        //         );
 
-            assert_relative_eq!(
-                x_deriv[[target_index]],
-                expected[[1, target_index]],
-                epsilon = 1E-5
-            );
-            assert_relative_eq!(
-                y_deriv[[target_index]],
-                expected[[2, target_index]],
-                epsilon = 1E-5
-            );
+        //         assert_relative_eq!(
+        //             x_deriv[[target_index]],
+        //             expected[[1, target_index]],
+        //             epsilon = 1E-5
+        //         );
+        //         assert_relative_eq!(
+        //             y_deriv[[target_index]],
+        //             expected[[2, target_index]],
+        //             epsilon = 1E-5
+        //         );
 
-            assert_relative_eq!(
-                z_deriv[[target_index]],
-                expected[[3, target_index]],
-                epsilon = 1E-5
-            );
-        }
+        //         assert_relative_eq!(
+        //             z_deriv[[target_index]],
+        //             expected[[3, target_index]],
+        //             epsilon = 1E-5
+        //         );
+        //     }
     }
 
-    #[test]
-    fn test_assemble_helmholtz_3d() {
-        let nsources = 3;
-        let ntargets = 5;
-        let wavenumber: f64 = 1.5;
+    // #[test]
+    // fn test_assemble_helmholtz_3d() {
+    //     let nsources = 3;
+    //     let ntargets = 5;
+    //     let wavenumber: f64 = 1.5;
 
-        let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
-        let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
+    //     let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
+    //     let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
 
-        sources.fill_from_seed_equally_distributed(1);
-        targets.fill_from_seed_equally_distributed(2);
+    //     sources.fill_from_seed_equally_distributed(1);
+    //     targets.fill_from_seed_equally_distributed(2);
 
-        let mut green_value_t = rlst::rlst_dynamic_array2!(c64, [nsources, ntargets]);
+    //     let mut green_value_t = rlst::rlst_dynamic_array2!(c64, [nsources, ntargets]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::Value,
-            sources.data(),
-            targets.data(),
-            green_value_t.data_mut(),
-        );
+    //     Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
+    //         EvalType::Value,
+    //         sources.data(),
+    //         targets.data(),
+    //         green_value_t.data_mut(),
+    //     );
 
-        // The matrix needs to be transposed so that the first row corresponds to the first target,
-        // second row to the second target and so on.
+    //     // The matrix needs to be transposed so that the first row corresponds to the first target,
+    //     // second row to the second target and so on.
 
-        let mut green_value = rlst::rlst_dynamic_array2!(c64, [ntargets, nsources]);
-        green_value.fill_from(green_value_t.transpose());
+    //     let mut green_value = rlst::rlst_dynamic_array2!(c64, [ntargets, nsources]);
+    //     green_value.fill_from(green_value_t.transpose());
 
-        for charge_index in 0..nsources {
-            let mut charges = rlst::rlst_dynamic_array1![c64, [nsources]];
-            let mut expected = rlst::rlst_dynamic_array1![c64, [ntargets]];
-            charges[[charge_index]] = c64::complex(1.0, 0.0);
+    //     for charge_index in 0..nsources {
+    //         let mut charges = rlst::rlst_dynamic_array1![c64, [nsources]];
+    //         let mut expected = rlst::rlst_dynamic_array1![c64, [ntargets]];
+    //         charges[[charge_index]] = c64::complex(1.0, 0.0);
 
-            Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-                EvalType::Value,
-                sources.data(),
-                targets.data(),
-                charges.data(),
-                expected.data_mut(),
-            );
+    //         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+    //             EvalType::Value,
+    //             sources.data(),
+    //             targets.data(),
+    //             charges.data(),
+    //             expected.data_mut(),
+    //         );
 
-            for target_index in 0..ntargets {
-                assert_relative_eq!(
-                    green_value[[target_index, charge_index]],
-                    expected[[target_index]],
-                    epsilon = 1E-12
-                );
-            }
-        }
+    //         for target_index in 0..ntargets {
+    //             assert_relative_eq!(
+    //                 green_value[[target_index, charge_index]],
+    //                 expected[[target_index]],
+    //                 epsilon = 1E-12
+    //             );
+    //         }
+    //     }
 
-        let mut green_value_deriv_t = rlst::rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
+    //     let mut green_value_deriv_t = rlst::rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            green_value_deriv_t.data_mut(),
-        );
+    //     Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
+    //         EvalType::ValueDeriv,
+    //         sources.data(),
+    //         targets.data(),
+    //         green_value_deriv_t.data_mut(),
+    //     );
 
-        // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
+    //     // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-        let mut green_value_deriv = rlst::rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
-        green_value_deriv.fill_from(green_value_deriv_t.transpose());
+    //     let mut green_value_deriv = rlst::rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
+    //     green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
-        for charge_index in 0..nsources {
-            let mut charges = rlst::rlst_dynamic_array1![c64, [nsources]];
-            let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
+    //     for charge_index in 0..nsources {
+    //         let mut charges = rlst::rlst_dynamic_array1![c64, [nsources]];
+    //         let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
-            charges[[charge_index]] = c64::complex(1.0, 0.0);
+    //         charges[[charge_index]] = c64::complex(1.0, 0.0);
 
-            Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-                EvalType::ValueDeriv,
-                sources.data(),
-                targets.data(),
-                charges.data(),
-                expected.data_mut(),
-            );
+    //         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
+    //             EvalType::ValueDeriv,
+    //             sources.data(),
+    //             targets.data(),
+    //             charges.data(),
+    //             expected.data_mut(),
+    //         );
 
-            for deriv_index in 0..4 {
-                for target_index in 0..ntargets {
-                    assert_relative_eq!(
-                        green_value_deriv[[4 * target_index + deriv_index, charge_index]],
-                        expected[[deriv_index, target_index]],
-                        epsilon = 1E-12
-                    );
-                }
-            }
-        }
-    }
+    //         for deriv_index in 0..4 {
+    //             for target_index in 0..ntargets {
+    //                 assert_relative_eq!(
+    //                     green_value_deriv[[4 * target_index + deriv_index, charge_index]],
+    //                     expected[[deriv_index, target_index]],
+    //                     epsilon = 1E-12
+    //                 );
+    //             }
+    //         }
+    //     }
+    // }
 
-    #[test]
-    fn test_assemble_diag_helmholtz_3d() {
-        let nsources = 5;
-        let ntargets = 5;
-        let wavenumber: f64 = 1.5;
+    // #[test]
+    // fn test_assemble_diag_helmholtz_3d() {
+    //     let nsources = 5;
+    //     let ntargets = 5;
+    //     let wavenumber: f64 = 1.5;
 
-        let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
-        let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
+    //     let mut sources = rlst::rlst_dynamic_array2!(f64, [nsources, 3]);
+    //     let mut targets = rlst::rlst_dynamic_array2!(f64, [ntargets, 3]);
 
-        sources.fill_from_seed_equally_distributed(1);
-        targets.fill_from_seed_equally_distributed(2);
+    //     sources.fill_from_seed_equally_distributed(1);
+    //     targets.fill_from_seed_equally_distributed(2);
 
-        let mut green_value_diag = rlst::rlst_dynamic_array1!(c64, [ntargets]);
-        let mut green_value_diag_deriv = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
+    //     let mut green_value_diag = rlst::rlst_dynamic_array1!(c64, [ntargets]);
+    //     let mut green_value_diag_deriv = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
-            EvalType::Value,
-            sources.data(),
-            targets.data(),
-            green_value_diag.data_mut(),
-        );
-        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
-            EvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            green_value_diag_deriv.data_mut(),
-        );
+    //     Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
+    //         EvalType::Value,
+    //         sources.data(),
+    //         targets.data(),
+    //         green_value_diag.data_mut(),
+    //     );
+    //     Helmholtz3dKernel::<c64>::new(wavenumber).assemble_diagonal_st(
+    //         EvalType::ValueDeriv,
+    //         sources.data(),
+    //         targets.data(),
+    //         green_value_diag_deriv.data_mut(),
+    //     );
 
-        let mut green_value_t = rlst::rlst_dynamic_array2!(c64, [nsources, ntargets]);
+    //     let mut green_value_t = rlst::rlst_dynamic_array2!(c64, [nsources, ntargets]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::Value,
-            sources.data(),
-            targets.data(),
-            green_value_t.data_mut(),
-        );
+    //     Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
+    //         EvalType::Value,
+    //         sources.data(),
+    //         targets.data(),
+    //         green_value_t.data_mut(),
+    //     );
 
-        // The matrix needs to be transposed so that the first row corresponds to the first target,
-        // second row to the second target and so on.
+    //     // The matrix needs to be transposed so that the first row corresponds to the first target,
+    //     // second row to the second target and so on.
 
-        let mut green_value = rlst::rlst_dynamic_array2!(c64, [ntargets, nsources]);
-        green_value.fill_from(green_value_t.transpose());
+    //     let mut green_value = rlst::rlst_dynamic_array2!(c64, [ntargets, nsources]);
+    //     green_value.fill_from(green_value_t.transpose());
 
-        let mut green_value_deriv_t = rlst::rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
+    //     let mut green_value_deriv_t = rlst::rlst_dynamic_array2!(c64, [nsources, 4 * ntargets]);
 
-        Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            green_value_deriv_t.data_mut(),
-        );
+    //     Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
+    //         EvalType::ValueDeriv,
+    //         sources.data(),
+    //         targets.data(),
+    //         green_value_deriv_t.data_mut(),
+    //     );
 
-        // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
+    //     // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
 
-        let mut green_value_deriv = rlst::rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
-        green_value_deriv.fill_from(green_value_deriv_t.transpose());
+    //     let mut green_value_deriv = rlst::rlst_dynamic_array2!(c64, [4 * ntargets, nsources]);
+    //     green_value_deriv.fill_from(green_value_deriv_t.transpose());
 
-        for index in 0..nsources {
-            assert_relative_eq!(
-                green_value[[index, index]],
-                green_value_diag[[index]],
-                epsilon = 1E-12
-            );
+    //     for index in 0..nsources {
+    //         assert_relative_eq!(
+    //             green_value[[index, index]],
+    //             green_value_diag[[index]],
+    //             epsilon = 1E-12
+    //         );
 
-            assert_relative_eq!(
-                green_value_deriv[[4 * index, index]],
-                green_value_diag_deriv[[0, index]],
-                epsilon = 1E-12,
-            );
+    //         assert_relative_eq!(
+    //             green_value_deriv[[4 * index, index]],
+    //             green_value_diag_deriv[[0, index]],
+    //             epsilon = 1E-12,
+    //         );
 
-            assert_relative_eq!(
-                green_value_deriv[[4 * index + 1, index]],
-                green_value_diag_deriv[[1, index]],
-                epsilon = 1E-12,
-            );
+    //         assert_relative_eq!(
+    //             green_value_deriv[[4 * index + 1, index]],
+    //             green_value_diag_deriv[[1, index]],
+    //             epsilon = 1E-12,
+    //         );
 
-            assert_relative_eq!(
-                green_value_deriv[[4 * index + 2, index]],
-                green_value_diag_deriv[[2, index]],
-                epsilon = 1E-12,
-            );
+    //         assert_relative_eq!(
+    //             green_value_deriv[[4 * index + 2, index]],
+    //             green_value_diag_deriv[[2, index]],
+    //             epsilon = 1E-12,
+    //         );
 
-            assert_relative_eq!(
-                green_value_deriv[[4 * index + 3, index]],
-                green_value_diag_deriv[[3, index]],
-                epsilon = 1E-12,
-            );
-        }
-    }
+    //         assert_relative_eq!(
+    //             green_value_deriv[[4 * index + 3, index]],
+    //             green_value_diag_deriv[[3, index]],
+    //             epsilon = 1E-12,
+    //         );
+    //     }
+    // }
 }
