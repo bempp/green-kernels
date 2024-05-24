@@ -1105,13 +1105,13 @@ mod test {
 
     #[test]
     fn test_assemble_laplace_3d() {
-        let nsources = 3;
-        let ntargets = 1;
+        let nsources = 7;
+        let ntargets = 5;
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
         let mut sources = rlst_dynamic_array2!(f64, [3, nsources]);
         let mut targets = rlst_dynamic_array2!(f64, [3, ntargets]);
-        let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
+        let mut green_value = rlst_dynamic_array2!(f64, [nsources, ntargets]);
 
         targets.fill_from_equally_distributed(&mut rng);
         sources.fill_from_equally_distributed(&mut rng);
@@ -1120,14 +1120,11 @@ mod test {
             EvalType::Value,
             sources.data(),
             targets.data(),
-            green_value_t.data_mut(),
+            green_value.data_mut(),
         );
 
         // The matrix needs to be transposed so that the first row corresponds to the first target,
         // second row to the second target and so on.
-
-        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
-        green_value.fill_from(green_value_t.transpose());
 
         for charge_index in 0..nsources {
             let mut charges = rlst_dynamic_array1![f64, [nsources]];
@@ -1144,14 +1141,14 @@ mod test {
 
             for target_index in 0..ntargets {
                 assert_relative_eq!(
-                    green_value[[target_index, charge_index]],
+                    green_value[[charge_index, target_index]],
                     expected[[target_index]],
                     epsilon = 1E-12
                 );
             }
         }
 
-        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,
@@ -1179,7 +1176,7 @@ mod test {
             for deriv_index in 0..4 {
                 for target_index in 0..ntargets {
                     assert_relative_eq!(
-                        green_value_deriv[[4 * target_index + deriv_index, charge_index]],
+                        green_value_deriv[[4 * charge_index + deriv_index, target_index]],
                         expected[[deriv_index, target_index]],
                         epsilon = 1E-12
                     );
