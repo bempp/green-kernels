@@ -373,7 +373,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                     sources: sources.coerce(),
                     charges: charges.coerce(),
                 });
-                result[0] = T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
+                result[0] += T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
             } else {
                 panic!()
             }
@@ -490,10 +490,10 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                     sources: sources.coerce(),
                     charges: charges.coerce(),
                 });
-                result[0] = T::from_real(to::<_, T::Real>(acc[0])).mul_real(m_inv_4pi);
-                result[1] = T::from_real(to::<_, T::Real>(acc[1])).mul_real(m_inv_4pi);
-                result[2] = T::from_real(to::<_, T::Real>(acc[2])).mul_real(m_inv_4pi);
-                result[3] = T::from_real(to::<_, T::Real>(acc[3])).mul_real(m_inv_4pi);
+                result[0] += T::from_real(to::<_, T::Real>(acc[0])).mul_real(m_inv_4pi);
+                result[1] += T::from_real(to::<_, T::Real>(acc[1])).mul_real(m_inv_4pi);
+                result[2] += T::from_real(to::<_, T::Real>(acc[2])).mul_real(m_inv_4pi);
+                result[3] += T::from_real(to::<_, T::Real>(acc[3])).mul_real(m_inv_4pi);
             } else if coe::is_same::<T, f64>() {
                 let acc = pulp::Arch::new().dispatch(Impl::<'_, f64> {
                     t0: to(target[0]),
@@ -502,10 +502,10 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                     sources: sources.coerce(),
                     charges: charges.coerce(),
                 });
-                result[0] = T::from_real(to::<_, T::Real>(acc[0])).mul_real(m_inv_4pi);
-                result[1] = T::from_real(to::<_, T::Real>(acc[1])).mul_real(m_inv_4pi);
-                result[2] = T::from_real(to::<_, T::Real>(acc[2])).mul_real(m_inv_4pi);
-                result[3] = T::from_real(to::<_, T::Real>(acc[3])).mul_real(m_inv_4pi);
+                result[0] += T::from_real(to::<_, T::Real>(acc[0])).mul_real(m_inv_4pi);
+                result[1] += T::from_real(to::<_, T::Real>(acc[1])).mul_real(m_inv_4pi);
+                result[2] += T::from_real(to::<_, T::Real>(acc[2])).mul_real(m_inv_4pi);
+                result[3] += T::from_real(to::<_, T::Real>(acc[3])).mul_real(m_inv_4pi);
             } else {
                 panic!()
             }
