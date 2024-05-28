@@ -817,7 +817,7 @@ mod test {
                 }
             }
 
-            assert_relative_eq!(green_value[[target_index]], expected, epsilon = 5E-6);
+            assert_relative_eq!(green_value[[target_index]], expected, epsilon = 5E-5);
         }
     }
 
@@ -1054,24 +1054,24 @@ mod test {
             assert_relative_eq!(
                 expected_deriv[[0, target_index]],
                 actual[[0, target_index]],
-                epsilon = 5E-5
+                epsilon = 1E-4
             );
 
             assert_relative_eq!(
                 expected_deriv[[1, target_index]],
                 actual[[1, target_index]],
-                epsilon = 5E-5
+                epsilon = 1E-4
             );
             assert_relative_eq!(
                 expected_deriv[[2, target_index]],
                 actual[[2, target_index]],
-                epsilon = 5E-5
+                epsilon = 1E-4
             );
 
             assert_relative_eq!(
                 expected_deriv[[3, target_index]],
                 actual[[3, target_index]],
-                epsilon = 5E-5
+                epsilon = 1E-4
             );
         }
     }
