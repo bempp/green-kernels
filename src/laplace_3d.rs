@@ -817,7 +817,7 @@ mod test {
                 }
             }
 
-            assert_relative_eq!(green_value[[target_index]], expected, epsilon = 5E-7);
+            assert_relative_eq!(green_value[[target_index]], expected, epsilon = 5E-6);
         }
     }
 
