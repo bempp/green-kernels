@@ -414,239 +414,221 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
             }
         }
         EvalType::ValueDeriv => {
-            //     struct Impl<'a, T: RlstScalar<Complex = T>>
-            //     where
-            //         T::Real: RlstSimd,
-            //     {
-            //         wavenumber: T::Real,
-            //         t0: T::Real,
-            //         t1: T::Real,
-            //         t2: T::Real,
+            struct Impl<'a, T: RlstScalar<Complex = T>>
+            where
+                T::Real: RlstSimd,
+            {
+                wavenumber: T::Real,
+                t0: T::Real,
+                t1: T::Real,
+                t2: T::Real,
 
-            //         sources: &'a [T::Real],
-            //         charges: &'a [T],
-            //     }
+                sources: &'a [T::Real],
+                charges: &'a [T],
+            }
 
-            //     impl<T: RlstScalar<Complex = T>> pulp::WithSimd for Impl<'_, T>
-            //     where
-            //         T::Real: RlstSimd,
-            //     {
-            //         type Output = [[T::Real; 2]; 4];
+            impl<T: RlstScalar<Complex = T>> pulp::WithSimd for Impl<'_, T>
+            where
+                T::Real: RlstSimd,
+            {
+                type Output = [[T::Real; 2]; 4];
 
-            //         #[inline(always)]
-            //         fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
-            //             use coe::Coerce;
+                #[inline(always)]
+                fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
+                    use coe::Coerce;
 
-            //             let Self {
-            //                 wavenumber,
-            //                 t0,
-            //                 t1,
-            //                 t2,
-            //                 sources,
-            //                 charges,
-            //             } = self;
+                    let Self {
+                        wavenumber,
+                        t0,
+                        t1,
+                        t2,
+                        sources,
+                        charges,
+                    } = self;
 
-            //             let (sources, _) = pulp::as_arrays::<3, T::Real>(sources);
-            //             let (sources_head, sources_tail) = <T::Real>::as_simd_slice_from_vec(sources);
-            //             let charges: &[[T::Real; 2]] = bytemuck::cast_slice(charges);
-            //             let (charges_head, charges_tail) = <T::Real>::as_simd_slice_from_vec(charges);
+                    let (sources, _) = pulp::as_arrays::<3, T::Real>(sources);
+                    let (sources_head, sources_tail) = <T::Real>::as_simd_slice_from_vec(sources);
+                    let charges: &[[T::Real; 2]] = bytemuck::cast_slice(charges);
+                    let (charges_head, charges_tail) = <T::Real>::as_simd_slice_from_vec(charges);
 
-            //             #[inline(always)]
-            //             fn impl_slice<T: RlstScalar<Complex = T>, S: Simd>(
-            //                 simd: S,
-            //                 wavenumber: T::Real,
-            //                 t0: T::Real,
-            //                 t1: T::Real,
-            //                 t2: T::Real,
-            //                 sources: &[[<T::Real as RlstSimd>::Scalars<S>; 3]],
-            //                 charges: &[[<T::Real as RlstSimd>::Scalars<S>; 2]],
-            //             ) -> [[T::Real; 2]; 4]
-            //             where
-            //                 T::Real: RlstSimd,
-            //             {
-            //                 let simd = SimdFor::<T::Real, S>::new(simd);
+                    #[inline(always)]
+                    fn impl_slice<T: RlstScalar<Complex = T>, S: Simd>(
+                        simd: S,
+                        wavenumber: T::Real,
+                        t0: T::Real,
+                        t1: T::Real,
+                        t2: T::Real,
+                        sources: &[[<T::Real as RlstSimd>::Scalars<S>; 3]],
+                        charges: &[[<T::Real as RlstSimd>::Scalars<S>; 2]],
+                    ) -> [[T::Real; 2]; 4]
+                    where
+                        T::Real: RlstSimd,
+                    {
+                        let simd = SimdFor::<T::Real, S>::new(simd);
 
-            //                 let t0 = simd.splat(t0);
-            //                 let t1 = simd.splat(t1);
-            //                 let t2 = simd.splat(t2);
-            //                 let zero = simd.splat(T::Real::zero());
-            //                 let wavenumber = simd.splat(wavenumber);
-            //                 let mut acc0_re = simd.splat(T::Real::zero());
-            //                 let mut acc0_im = simd.splat(T::Real::zero());
-            //                 let mut acc1_re = simd.splat(T::Real::zero());
-            //                 let mut acc1_im = simd.splat(T::Real::zero());
-            //                 let mut acc2_re = simd.splat(T::Real::zero());
-            //                 let mut acc2_im = simd.splat(T::Real::zero());
-            //                 let mut acc3_re = simd.splat(T::Real::zero());
-            //                 let mut acc3_im = simd.splat(T::Real::zero());
+                        let t0 = simd.splat(t0);
+                        let t1 = simd.splat(t1);
+                        let t2 = simd.splat(t2);
+                        let zero = simd.splat(T::Real::zero());
+                        let wavenumber = simd.splat(wavenumber);
+                        let mut acc0_re = simd.splat(T::Real::zero());
+                        let mut acc0_im = simd.splat(T::Real::zero());
+                        let mut acc1_re = simd.splat(T::Real::zero());
+                        let mut acc1_im = simd.splat(T::Real::zero());
+                        let mut acc2_re = simd.splat(T::Real::zero());
+                        let mut acc2_im = simd.splat(T::Real::zero());
+                        let mut acc3_re = simd.splat(T::Real::zero());
+                        let mut acc3_im = simd.splat(T::Real::zero());
 
-            //                 for (&s, &c) in itertools::izip!(sources, charges) {
-            //                     let [sx, sy, sz] = simd.deinterleave(s);
-            //                     let [c_re, c_im] = simd.deinterleave(c);
+                        for (&s, &c) in itertools::izip!(sources, charges) {
+                            let [sx, sy, sz] = simd.deinterleave(s);
+                            let [c_re, c_im] = simd.deinterleave(c);
 
-            //                     let diff0 = simd.sub(sx, t0);
-            //                     let diff1 = simd.sub(sy, t1);
-            //                     let diff2 = simd.sub(sz, t2);
+                            let diff0 = simd.sub(sx, t0);
+                            let diff1 = simd.sub(sy, t1);
+                            let diff2 = simd.sub(sz, t2);
 
-            //                     let diff_norm = simd.sqrt(simd.mul_add(
-            //                         diff0,
-            //                         diff0,
-            //                         simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
-            //                     ));
+                            let diff_norm = simd.sqrt(simd.mul_add(
+                                diff0,
+                                diff0,
+                                simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
+                            ));
 
-            //                     let is_zero = simd.cmp_eq(diff_norm, zero);
-            //                     let inv_diff_norm = simd.select(
-            //                         is_zero,
-            //                         zero,
-            //                         simd.div(simd.splat(T::Real::one()), diff_norm),
-            //                     );
-            //                     let kr = simd.mul(wavenumber, diff_norm);
+                            let is_zero = simd.cmp_eq(diff_norm, zero);
+                            let inv_diff_norm = simd.select(
+                                is_zero,
+                                zero,
+                                simd.div(simd.splat(T::Real::one()), diff_norm),
+                            );
+                            let kr = simd.mul(wavenumber, diff_norm);
 
-            //                     let (g_re, g_im) = {
-            //                         let (s, c) = simd.sin_cos(kr);
-            //                         (simd.mul(c, inv_diff_norm), simd.mul(s, inv_diff_norm))
-            //                     };
+                            let (g_re, g_im) = {
+                                let (s, c) = simd.sin_cos(kr);
+                                (simd.mul(c, inv_diff_norm), simd.mul(s, inv_diff_norm))
+                            };
 
-            //                     // Multiply already with charges as need for function and derivatives.
+                            // Multiply already with charges as need for function and derivatives.
 
-            //                     let (g_re, g_im) = (
-            //                         simd.mul_add(g_re, c_re, simd.mul_add(simd.neg(g_im), c_im, g_re)),
-            //                         simd.mul_add(g_re, c_im, simd.mul_add(g_im, c_re, g_im)),
-            //                     );
+                            let (g_re, g_im) = (
+                                simd.mul_add(simd.neg(g_im), c_im, simd.mul(g_re, c_re)),
+                                simd.mul_add(g_im, c_re, simd.mul(g_re, c_im)),
+                            );
 
-            //                     let inv_diff_norm_squared = simd.mul(inv_diff_norm, inv_diff_norm);
+                            let inv_diff_norm_squared = simd.mul(inv_diff_norm, inv_diff_norm);
 
-            //                     let (g_deriv_re, g_deriv_im) = (
-            //                         simd.mul(g_re, inv_diff_norm_squared),
-            //                         simd.mul(g_im, inv_diff_norm_squared),
-            //                     );
+                            let (g_deriv_re, g_deriv_im) = (
+                                simd.mul(g_re, inv_diff_norm_squared),
+                                simd.mul(g_im, inv_diff_norm_squared),
+                            );
 
-            //                     let (g_deriv_re, g_deriv_im) = (
-            //                         simd.mul_add(g_im, kr, g_re),
-            //                         simd.mul_add(simd.neg(g_re), kr, g_im),
-            //                     );
+                            let (g_deriv_re, g_deriv_im) = (
+                                simd.mul_add(g_deriv_im, kr, g_deriv_re),
+                                simd.mul_add(simd.neg(g_deriv_re), kr, g_deriv_im),
+                            );
 
-            //                     acc0_re = simd.add(acc0_re, g_re);
-            //                     acc0_im = smd
+                            acc0_re = simd.add(acc0_re, g_re);
+                            acc0_im = simd.add(acc0_im, g_im);
 
-            //                     acc0_re = simd.mul_add(
-            //                         g_re,
-            //                         c_re,
-            //                         simd.mul_add(simd.neg(g_im), c_im, acc0_re),
-            //                     );
-            //                     acc0_im = simd.mul_add(g_re, c_im, simd.mul_add(g_im, c_re, acc0_im));
-            //                 }
-            //                 (simd.reduce_add(acc_re), simd.reduce_add(acc_im))
-            //             }
+                            acc1_re = simd.mul_add(g_deriv_re, diff0, acc1_re);
+                            acc1_im = simd.mul_add(g_deriv_im, diff0, acc1_im);
 
-            //             let (re0, im0) = impl_slice::<T, S>(
-            //                 simd,
-            //                 wavenumber,
-            //                 t0,
-            //                 t1,
-            //                 t2,
-            //                 sources_head,
-            //                 charges_head,
-            //             );
-            //             let (re1, im1) = impl_slice::<T, pulp::Scalar>(
-            //                 pulp::Scalar::new(),
-            //                 wavenumber,
-            //                 t0,
-            //                 t1,
-            //                 t2,
-            //                 sources_tail.coerce(),
-            //                 charges_tail.coerce(),
-            //             );
+                            acc2_re = simd.mul_add(g_deriv_re, diff1, acc2_re);
+                            acc2_im = simd.mul_add(g_deriv_im, diff1, acc2_im);
 
-            //             (re0 + re1, im0 + im1)
-            //         }
-            //     }
+                            acc3_re = simd.mul_add(g_deriv_re, diff2, acc3_re);
+                            acc3_im = simd.mul_add(g_deriv_im, diff2, acc3_im);
+                        }
+                        [
+                            [simd.reduce_add(acc0_re), simd.reduce_add(acc0_im)],
+                            [simd.reduce_add(acc1_re), simd.reduce_add(acc1_im)],
+                            [simd.reduce_add(acc2_re), simd.reduce_add(acc2_im)],
+                            [simd.reduce_add(acc3_re), simd.reduce_add(acc3_im)],
+                        ]
+                    }
 
-            //     use coe::coerce_static as to;
-            //     use coe::Coerce;
-            //     if coe::is_same::<T, c32>() {
-            //         let (re, im) = pulp::Arch::new().dispatch(Impl::<'_, c32> {
-            //             wavenumber: to(wavenumber),
-            //             t0: to(target[0]),
-            //             t1: to(target[1]),
-            //             t2: to(target[2]),
-            //             sources: sources.coerce(),
-            //             charges: charges.coerce(),
-            //         });
-            //         result[0] += T::Complex::complex(to::<_, T::Real>(re), to::<_, T::Real>(im))
-            //             .mul_real(m_inv_4pi);
-            //     } else if coe::is_same::<T, c64>() {
-            //         let (re, im) = pulp::Arch::new().dispatch(Impl::<'_, c64> {
-            //             wavenumber: to(wavenumber),
-            //             t0: to(target[0]),
-            //             t1: to(target[1]),
-            //             t2: to(target[2]),
-            //             sources: sources.coerce(),
-            //             charges: charges.coerce(),
-            //         });
-            //         result[0] += T::Complex::complex(to::<_, T::Real>(re), to::<_, T::Real>(im))
-            //             .mul_real(m_inv_4pi);
-            //     } else {
-            //         panic!()
-            //     }
-        } // Cannot simply use an array my_result as this is not
-          // correctly auto-vectorized.
+                    let res1 = impl_slice::<T, S>(
+                        simd,
+                        wavenumber,
+                        t0,
+                        t1,
+                        t2,
+                        sources_head,
+                        charges_head,
+                    );
+                    let res2 = impl_slice::<T, pulp::Scalar>(
+                        pulp::Scalar::new(),
+                        wavenumber,
+                        t0,
+                        t1,
+                        t2,
+                        sources_tail.coerce(),
+                        charges_tail.coerce(),
+                    );
 
-          //     let mut my_result0_real = <T::Real as Zero>::zero();
-          //     let mut my_result1_real = <T::Real as Zero>::zero();
-          //     let mut my_result2_real = <T::Real as Zero>::zero();
-          //     let mut my_result3_real = <T::Real as Zero>::zero();
+                    [
+                        [res1[0][0] + res2[0][0], res1[0][1] + res2[0][1]],
+                        [res1[1][0] + res2[1][0], res1[1][1] + res2[1][1]],
+                        [res1[2][0] + res2[2][0], res1[2][1] + res2[2][1]],
+                        [res1[3][0] + res2[3][0], res1[3][1] + res2[3][1]],
+                    ]
+                }
+            }
 
-          //     let mut my_result0_imag = <T::Real as Zero>::zero();
-          //     let mut my_result1_imag = <T::Real as Zero>::zero();
-          //     let mut my_result2_imag = <T::Real as Zero>::zero();
-          //     let mut my_result3_imag = <T::Real as Zero>::zero();
+            use coe::coerce_static as to;
+            use coe::Coerce;
+            if coe::is_same::<T, c32>() {
+                let res = pulp::Arch::new().dispatch(Impl::<'_, c32> {
+                    wavenumber: to(wavenumber),
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources: sources.coerce(),
+                    charges: charges.coerce(),
+                });
+                result[0] +=
+                    T::Complex::complex(to::<_, T::Real>(res[0][0]), to::<_, T::Real>(res[0][1]))
+                        .mul_real(m_inv_4pi);
 
-          //     for index in 0..nsources {
-          //         diff0 = sources0[index] - target[0];
-          //         diff1 = sources1[index] - target[1];
-          //         diff2 = sources2[index] - target[2];
-          //         let diff_norm = (diff0 * diff0 + diff1 * diff1 + diff2 * diff2).sqrt();
-          //         let inv_diff_norm = {
-          //             if diff_norm == zero_real {
-          //                 zero_real
-          //             } else {
-          //                 one_real / diff_norm
-          //             }
-          //         };
-          //         let inv_diff_norm_squared = inv_diff_norm * inv_diff_norm;
+                result[1] +=
+                    T::Complex::complex(to::<_, T::Real>(res[1][0]), to::<_, T::Real>(res[1][1]))
+                        .mul_real(m_inv_4pi);
 
-          //         let kr = wavenumber * diff_norm;
-          //         let g_re = <T::Real as RlstScalar>::cos(kr) * inv_diff_norm * m_inv_4pi;
-          //         let g_im = <T::Real as RlstScalar>::sin(kr) * inv_diff_norm * m_inv_4pi;
+                result[2] +=
+                    T::Complex::complex(to::<_, T::Real>(res[2][0]), to::<_, T::Real>(res[2][1]))
+                        .mul_real(m_inv_4pi);
 
-          //         let g_deriv_im = (g_im - g_re * kr) * inv_diff_norm_squared;
-          //         let g_deriv_re = (g_re + g_im * kr) * inv_diff_norm_squared;
+                result[3] +=
+                    T::Complex::complex(to::<_, T::Real>(res[3][0]), to::<_, T::Real>(res[3][1]))
+                        .mul_real(m_inv_4pi);
+            } else if coe::is_same::<T, c64>() {
+                let res = pulp::Arch::new().dispatch(Impl::<'_, c64> {
+                    wavenumber: to(wavenumber),
+                    t0: to(target[0]),
+                    t1: to(target[1]),
+                    t2: to(target[2]),
+                    sources: sources.coerce(),
+                    charges: charges.coerce(),
+                });
 
-          //         let charge_re = charges[index].re();
-          //         let charge_im = charges[index].im();
+                result[0] +=
+                    T::Complex::complex(to::<_, T::Real>(res[0][0]), to::<_, T::Real>(res[0][1]))
+                        .mul_real(m_inv_4pi);
 
-          //         my_result0_imag += g_re * charge_im + g_im * charge_re;
-          //         my_result0_real += g_re * charge_re - g_im * charge_im;
+                result[1] +=
+                    T::Complex::complex(to::<_, T::Real>(res[1][0]), to::<_, T::Real>(res[1][1]))
+                        .mul_real(m_inv_4pi);
 
-          //         let times_charge_imag = g_deriv_re * charge_im + g_deriv_im * charge_re;
-          //         let times_charge_real = g_deriv_re * charge_re - g_deriv_im * charge_im;
+                result[2] +=
+                    T::Complex::complex(to::<_, T::Real>(res[2][0]), to::<_, T::Real>(res[2][1]))
+                        .mul_real(m_inv_4pi);
 
-          //         my_result1_real += times_charge_real * diff0;
-          //         my_result1_imag += times_charge_imag * diff0;
-
-          //         my_result2_real += times_charge_real * diff1;
-          //         my_result2_imag += times_charge_imag * diff1;
-
-          //         my_result3_real += times_charge_real * diff2;
-          //         my_result3_imag += times_charge_imag * diff2;
-          //     }
-
-          //     result[0] += <T::Complex as RlstScalar>::complex(my_result0_real, my_result0_imag);
-          //     result[1] += <T::Complex as RlstScalar>::complex(my_result1_real, my_result1_imag);
-          //     result[2] += <T::Complex as RlstScalar>::complex(my_result2_real, my_result2_imag);
-          //     result[3] += <T::Complex as RlstScalar>::complex(my_result3_real, my_result3_imag);
-          // }
+                result[3] +=
+                    T::Complex::complex(to::<_, T::Real>(res[3][0]), to::<_, T::Real>(res[3][1]))
+                        .mul_real(m_inv_4pi);
+            } else {
+                panic!()
+            }
+        }
     }
 }
 
@@ -772,28 +754,6 @@ fn helmholtz_component_count(eval_type: EvalType) -> usize {
     }
 }
 
-// pub fn simd_wrapper_evaluate(
-//     eval_type: EvalType,
-//     target: &[f32],
-//     sources: &[f32],
-//     charges: &[rlst_dense::types::c32],
-//     wavenumber: f32,
-//     result: &mut [rlst_dense::types::c32],
-// ) {
-//     evaluate_helmholtz_one_target::<rlst_dense::types::c32>(
-//         eval_type, target, sources, charges, wavenumber, result,
-//     )
-// }
-
-// pub fn simd_wrapper_assemble(
-//     eval_type: EvalType,
-//     target: &[f32],
-//     sources: &[f32],
-//     result: &mut [f32],
-// ) {
-//     assemble_helmholtz_one_target(eval_type, target, sources, result);
-// }
-
 #[cfg(test)]
 mod test {
 
@@ -808,7 +768,7 @@ mod test {
 
         let wavenumber: f32 = 1.5;
 
-        let nsources = 13;
+        let nsources = 19;
         let ntargets = 7;
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
@@ -830,114 +790,112 @@ mod test {
             green_value.data_mut(),
         );
 
-        for target_index in 0..ntargets {
-            let mut expected = c32::default();
-            for source_index in 0..nsources {
-                let dist = ((targets[[0, target_index]] - sources[[0, source_index]]).square()
-                    + (targets[[1, target_index]] - sources[[1, source_index]]).square()
-                    + (targets[[2, target_index]] - sources[[2, source_index]]).square())
-                .sqrt();
+        let mut expected_val = rlst_dynamic_array1!(c32, [ntargets]);
+        let mut expected_deriv = rlst_dynamic_array2!(c32, [4, ntargets]);
 
-                if dist > 0.0 {
-                    expected += charges[[source_index]]
-                        * c32::exp(c32::complex(0.0, wavenumber * dist))
-                        * 0.25
-                        * f32::FRAC_1_PI()
-                        / dist;
-                }
+        for (val, mut deriv, target) in itertools::izip!(
+            expected_val.iter_mut(),
+            expected_deriv.col_iter_mut(),
+            targets.col_iter(),
+        ) {
+            for (charge, source) in itertools::izip!(charges.iter(), sources.col_iter_mut()) {
+                let mut res: [c32; 1] = [c32::from_real(0.0)];
+                let mut res_deriv: [c32; 4] = [
+                    c32::from_real(0.0),
+                    c32::from_real(0.0),
+                    c32::from_real(0.0),
+                    c32::from_real(0.0),
+                ];
+                Helmholtz3dKernel::new(wavenumber).greens_fct(
+                    EvalType::Value,
+                    source.data(),
+                    target.data(),
+                    res.as_mut_slice(),
+                );
+                *val += charge * res[0];
+
+                Helmholtz3dKernel::new(wavenumber).greens_fct(
+                    EvalType::ValueDeriv,
+                    source.data(),
+                    target.data(),
+                    res_deriv.as_mut_slice(),
+                );
+
+                deriv[[0]] += charge * res_deriv[0];
+                deriv[[1]] += charge * res_deriv[1];
+                deriv[[2]] += charge * res_deriv[2];
+                deriv[[3]] += charge * res_deriv[3];
             }
-
-            assert_relative_eq!(green_value[[target_index]], expected, epsilon = eps);
         }
 
-        //     let mut targets_x_eps = copy(&targets);
-        //     let mut targets_y_eps = copy(&targets);
-        //     let mut targets_z_eps = copy(&targets);
+        for target_index in 0..ntargets {
+            assert_relative_eq!(
+                green_value[[target_index]],
+                expected_val[[target_index]],
+                epsilon = eps
+            );
+        }
 
-        //     for index in 0..ntargets {
-        //         targets_x_eps[[index, 0]] += eps;
-        //         targets_y_eps[[index, 1]] += eps;
-        //         targets_z_eps[[index, 2]] += eps;
-        //     }
+        let mut actual = rlst::rlst_dynamic_array2!(c32, [4, ntargets]);
 
-        //     let mut expected = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
+        Helmholtz3dKernel::<c32>::new(wavenumber).evaluate_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            charges.data(),
+            actual.data_mut(),
+        );
 
-        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-        //         EvalType::ValueDeriv,
-        //         sources.data(),
-        //         targets.data(),
-        //         charges.data(),
-        //         expected.data_mut(),
-        //     );
+        for target_index in 0..ntargets {
+            // let mut my_result = [
+            //     c32::from_real(0.0),
+            //     c32::from_real(0.0),
+            //     c32::from_real(0.0),
+            //     c32::from_real(0.0),
+            // ];
+            // Helmholtz3dKernel::<c32>::new(wavenumber).greens_fct(
+            //     EvalType::ValueDeriv,
+            //     sources.data(),
+            //     targets.data(),
+            //     my_result.as_mut_slice(),
+            // );
 
-        //     let mut green_value_x_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
+            // println!(
+            //     "Values: {} {} {}",
+            //     my_result[0] * charges[[0]],
+            //     green_value[[target_index]],
+            //     actual[[0, target_index]]
+            // );
+            assert_relative_eq!(
+                expected_deriv[[0, target_index]],
+                actual[[0, target_index]],
+                epsilon = 1E-5
+            );
 
-        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-        //         EvalType::Value,
-        //         sources.data(),
-        //         targets_x_eps.data(),
-        //         charges.data(),
-        //         green_value_x_eps.data_mut(),
-        //     );
+            // println!(
+            //     "Second deriv: {} {} {}",
+            //     my_result[2] * charges[[0]],
+            //     expected_deriv[[2, target_index]],
+            //     actual[[2, target_index]]
+            // );
 
-        //     let mut green_value_y_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
+            assert_relative_eq!(
+                expected_deriv[[1, target_index]],
+                actual[[1, target_index]],
+                epsilon = 1E-5
+            );
+            assert_relative_eq!(
+                expected_deriv[[2, target_index]],
+                actual[[2, target_index]],
+                epsilon = 1E-5
+            );
 
-        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-        //         EvalType::Value,
-        //         sources.data(),
-        //         targets_y_eps.data(),
-        //         charges.data(),
-        //         green_value_y_eps.data_mut(),
-        //     );
-        //     let mut green_value_z_eps = rlst::rlst_dynamic_array1![c64, [ntargets]];
-
-        //     Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-        //         EvalType::Value,
-        //         sources.data(),
-        //         targets_z_eps.data(),
-        //         charges.data(),
-        //         green_value_z_eps.data_mut(),
-        //     );
-
-        //     let mut x_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
-        //     let mut y_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
-        //     let mut z_deriv = rlst::rlst_dynamic_array1![c64, [ntargets]];
-
-        //     x_deriv.fill_from(
-        //         (green_value_x_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
-        //     );
-
-        //     y_deriv.fill_from(
-        //         (green_value_y_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
-        //     );
-        //     z_deriv.fill_from(
-        //         (green_value_z_eps.view() - green_value.view()).scalar_mul(c64::from_real(1.0 / eps)),
-        //     );
-
-        //     for target_index in 0..ntargets {
-        //         assert_relative_eq!(
-        //             green_value[[target_index]],
-        //             expected[[0, target_index]],
-        //             epsilon = 1E-12
-        //         );
-
-        //         assert_relative_eq!(
-        //             x_deriv[[target_index]],
-        //             expected[[1, target_index]],
-        //             epsilon = 1E-5
-        //         );
-        //         assert_relative_eq!(
-        //             y_deriv[[target_index]],
-        //             expected[[2, target_index]],
-        //             epsilon = 1E-5
-        //         );
-
-        //         assert_relative_eq!(
-        //             z_deriv[[target_index]],
-        //             expected[[3, target_index]],
-        //             epsilon = 1E-5
-        //         );
-        //     }
+            assert_relative_eq!(
+                expected_deriv[[3, target_index]],
+                actual[[3, target_index]],
+                epsilon = 1E-5
+            );
+        }
     }
 
     // #[test]
