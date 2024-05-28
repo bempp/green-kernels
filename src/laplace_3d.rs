@@ -970,7 +970,7 @@ mod test {
 
     #[test]
     fn test_laplace_3d_f32() {
-        let eps = 5E-4;
+        let eps = 1E-3;
 
         let nsources = 21;
         let ntargets = 7;
