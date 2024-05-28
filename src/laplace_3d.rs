@@ -972,7 +972,7 @@ mod test {
     fn test_laplace_3d_f32() {
         let eps = 5E-5;
 
-        let nsources = 19;
+        let nsources = 21;
         let ntargets = 7;
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
