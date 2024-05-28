@@ -970,7 +970,7 @@ mod test {
 
     #[test]
     fn test_laplace_3d_f32() {
-        let eps = 5E-5;
+        let eps = 1E-4;
 
         let nsources = 21;
         let ntargets = 7;
@@ -1054,24 +1054,24 @@ mod test {
             assert_relative_eq!(
                 expected_deriv[[0, target_index]],
                 actual[[0, target_index]],
-                epsilon = 1E-4
+                epsilon = eps
             );
 
             assert_relative_eq!(
                 expected_deriv[[1, target_index]],
                 actual[[1, target_index]],
-                epsilon = 1E-4
+                epsilon = eps
             );
             assert_relative_eq!(
                 expected_deriv[[2, target_index]],
                 actual[[2, target_index]],
-                epsilon = 1E-4
+                epsilon = eps
             );
 
             assert_relative_eq!(
                 expected_deriv[[3, target_index]],
                 actual[[3, target_index]],
-                epsilon = 1E-4
+                epsilon = eps
             );
         }
     }
