@@ -847,37 +847,11 @@ mod test {
         );
 
         for target_index in 0..ntargets {
-            // let mut my_result = [
-            //     c32::from_real(0.0),
-            //     c32::from_real(0.0),
-            //     c32::from_real(0.0),
-            //     c32::from_real(0.0),
-            // ];
-            // Helmholtz3dKernel::<c32>::new(wavenumber).greens_fct(
-            //     EvalType::ValueDeriv,
-            //     sources.data(),
-            //     targets.data(),
-            //     my_result.as_mut_slice(),
-            // );
-
-            // println!(
-            //     "Values: {} {} {}",
-            //     my_result[0] * charges[[0]],
-            //     green_value[[target_index]],
-            //     actual[[0, target_index]]
-            // );
             assert_relative_eq!(
                 expected_deriv[[0, target_index]],
                 actual[[0, target_index]],
                 epsilon = 1E-5
             );
-
-            // println!(
-            //     "Second deriv: {} {} {}",
-            //     my_result[2] * charges[[0]],
-            //     expected_deriv[[2, target_index]],
-            //     actual[[2, target_index]]
-            // );
 
             assert_relative_eq!(
                 expected_deriv[[1, target_index]],
