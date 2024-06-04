@@ -292,7 +292,7 @@ where
             });
     }
 
-    fn assemble_diagonal_st(
+    fn assemble_pairwise_st(
         &self,
         eval_type: EvalType,
         sources: &[<Self::T as RlstScalar>::Real],

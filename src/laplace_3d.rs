@@ -138,7 +138,7 @@ where
             });
     }
 
-    fn assemble_diagonal_st(
+    fn assemble_pairwise_st(
         &self,
         eval_type: EvalType,
         sources: &[<Self::T as RlstScalar>::Real],
@@ -146,24 +146,221 @@ where
         result: &mut [Self::T],
     ) {
         check_dimensions_assemble_diagonal(self, eval_type, sources, targets, result);
-        let range_dim = self.range_component_count(eval_type);
+        let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
-        result
-            .chunks_exact_mut(range_dim)
-            .enumerate()
-            .for_each(|(target_index, my_chunk)| {
-                let target = [
-                    targets[3 * target_index],
-                    targets[3 * target_index + 1],
-                    targets[3 * target_index + 2],
-                ];
-                let source = [
-                    sources[3 * target_index],
-                    sources[3 * target_index + 1],
-                    sources[3 * target_index + 2],
-                ];
-                self.greens_fct(eval_type, &source, &target, my_chunk)
-            });
+        match eval_type {
+            EvalType::Value => {
+                struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
+                    m_inv_4pi: T,
+
+                    sources: &'a [T],
+                    targets: &'a [T],
+                    result: &'a mut [T],
+                }
+
+                impl<T: RlstScalar<Real = T> + RlstSimd> pulp::WithSimd for Impl<'_, T> {
+                    type Output = ();
+
+                    #[inline(always)]
+                    fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
+                        use coe::Coerce;
+
+                        let Self {
+                            m_inv_4pi,
+                            sources,
+                            targets,
+                            result,
+                        } = self;
+
+                        let (sources, _) = pulp::as_arrays::<3, T>(sources);
+                        let (targets, _) = pulp::as_arrays::<3, T>(targets);
+                        let (sources_head, sources_tail) = T::as_simd_slice_from_vec(sources);
+                        let (targets_head, targets_tail) = T::as_simd_slice_from_vec(targets);
+                        let (result_head, result_tail) = T::as_simd_slice_mut(result);
+
+                        fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
+                            simd: S,
+                            m_inv_4pi: T,
+                            sources: &[[T::Scalars<S>; 3]],
+                            targets: &[[T::Scalars<S>; 3]],
+                            result: &mut [T::Scalars<S>],
+                        ) {
+                            let simd = SimdFor::<T, S>::new(simd);
+
+                            let m_inv_4pi = simd.splat(m_inv_4pi);
+                            let zero = simd.splat(T::zero());
+
+                            for (&s, &t, r) in itertools::izip!(sources, targets, result) {
+                                let [s0, s1, s2] = simd.deinterleave(s);
+                                let [t0, t1, t2] = simd.deinterleave(t);
+
+                                let diff0 = simd.sub(s0, t0);
+                                let diff1 = simd.sub(s1, t1);
+                                let diff2 = simd.sub(s2, t2);
+
+                                let square_sum = simd.mul_add(
+                                    diff0,
+                                    diff0,
+                                    simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
+                                );
+
+                                let is_zero = simd.cmp_eq(square_sum, zero);
+                                *r = simd.select(
+                                    is_zero,
+                                    zero,
+                                    simd.mul(simd.approx_recip_sqrt(square_sum), m_inv_4pi),
+                                );
+                            }
+                        }
+
+                        impl_slice::<T, S>(
+                            simd,
+                            m_inv_4pi,
+                            sources_head,
+                            targets_head,
+                            result_head,
+                        );
+                        impl_slice::<T, pulp::Scalar>(
+                            pulp::Scalar::new(),
+                            m_inv_4pi,
+                            sources_tail.coerce(),
+                            targets_tail.coerce(),
+                            result_tail.coerce(),
+                        );
+                    }
+                }
+
+                use coe::coerce_static as to;
+                use coe::Coerce;
+                if coe::is_same::<T, f32>() {
+                    pulp::Arch::new().dispatch(Impl::<'_, f32> {
+                        m_inv_4pi: to(m_inv_4pi),
+                        sources: sources.coerce(),
+                        targets: targets.coerce(),
+                        result: result.coerce(),
+                    });
+                } else if coe::is_same::<T, f64>() {
+                    pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                        m_inv_4pi: to(m_inv_4pi),
+                        sources: sources.coerce(),
+                        targets: targets.coerce(),
+                        result: result.coerce(),
+                    });
+                } else {
+                    panic!()
+                }
+            }
+            EvalType::ValueDeriv => {
+                struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
+                    m_inv_4pi: T,
+
+                    sources: &'a [T],
+                    targets: &'a [T],
+                    result: &'a mut [T],
+                }
+
+                impl<T: RlstScalar<Real = T> + RlstSimd> pulp::WithSimd for Impl<'_, T> {
+                    type Output = ();
+
+                    #[inline(always)]
+                    fn with_simd<S: pulp::Simd>(self, simd: S) -> Self::Output {
+                        use coe::Coerce;
+
+                        let Self {
+                            m_inv_4pi,
+                            sources,
+                            targets,
+                            result,
+                        } = self;
+
+                        let (sources, _) = pulp::as_arrays::<3, T>(sources);
+                        let (sources_head, sources_tail) = T::as_simd_slice_from_vec(sources);
+                        let (targets, _) = pulp::as_arrays::<3, T>(targets);
+                        let (targets_head, targets_tail) = T::as_simd_slice_from_vec(targets);
+                        let (result, _) = pulp::as_arrays_mut::<4, T>(result);
+                        let (result_head, result_tail) =
+                            T::as_simd_slice_from_vec_mut::<_, 4>(result);
+
+                        fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
+                            simd: S,
+                            m_inv_4pi: T,
+                            sources: &[[T::Scalars<S>; 3]],
+                            targets: &[[T::Scalars<S>; 3]],
+                            result: &mut [[T::Scalars<S>; 4]],
+                        ) {
+                            let simd = SimdFor::<T, S>::new(simd);
+
+                            let m_inv_4pi = simd.splat(m_inv_4pi);
+
+                            let zero = simd.splat(T::zero());
+
+                            for (&s, &t, r) in itertools::izip!(sources, targets, result) {
+                                let [s0, s1, s2] = simd.deinterleave(s);
+                                let [t0, t1, t2] = simd.deinterleave(t);
+
+                                let diff0 = simd.sub(s0, t0);
+                                let diff1 = simd.sub(s1, t1);
+                                let diff2 = simd.sub(s2, t2);
+
+                                let square_sum = simd.mul_add(
+                                    diff0,
+                                    diff0,
+                                    simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
+                                );
+
+                                let is_zero = simd.cmp_eq(square_sum, zero);
+                                let inv_abs =
+                                    simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
+
+                                let inv_abs_cube = simd.mul(inv_abs, simd.mul(inv_abs, inv_abs));
+
+                                r[0] = simd.mul(inv_abs, m_inv_4pi);
+                                r[1] = simd.mul(diff0, simd.mul(inv_abs_cube, m_inv_4pi));
+                                r[2] = simd.mul(diff1, simd.mul(inv_abs_cube, m_inv_4pi));
+                                r[3] = simd.mul(diff2, simd.mul(inv_abs_cube, m_inv_4pi));
+
+                                *r = simd.interleave(*r);
+                            }
+                        }
+
+                        impl_slice::<T, S>(
+                            simd,
+                            m_inv_4pi,
+                            sources_head,
+                            targets_head,
+                            result_head,
+                        );
+                        impl_slice::<T, pulp::Scalar>(
+                            pulp::Scalar::new(),
+                            m_inv_4pi,
+                            sources_tail.coerce(),
+                            targets_tail.coerce(),
+                            result_tail.coerce(),
+                        );
+                    }
+                }
+
+                use coe::coerce_static as to;
+                use coe::Coerce;
+                if coe::is_same::<T, f32>() {
+                    pulp::Arch::new().dispatch(Impl::<'_, f32> {
+                        m_inv_4pi: to(m_inv_4pi),
+                        sources: sources.coerce(),
+                        targets: targets.coerce(),
+                        result: result.coerce(),
+                    });
+                } else if coe::is_same::<T, f64>() {
+                    pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                        m_inv_4pi: to(m_inv_4pi),
+                        sources: sources.coerce(),
+                        targets: targets.coerce(),
+                        result: result.coerce(),
+                    });
+                } else {
+                    panic!()
+                }
+            }
+        }
     }
 
     fn range_component_count(&self, eval_type: EvalType) -> usize {
@@ -512,16 +709,6 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
         }
     }
 }
-
-// pub fn evaluate_laplace_one_target_f32(
-//     eval_type: EvalType,
-//     target: &[f32],
-//     sources: &[f32],
-//     charges: &[f32],
-//     result: &mut [f32],
-// ) {
-//     evaluate_laplace_one_target(eval_type, target, sources, charges, result);
-// }
 
 /// Assemble Laplace kernel with one target
 pub fn assemble_laplace_one_target<T: RlstScalar>(
@@ -1348,7 +1535,7 @@ mod test {
     }
 
     #[test]
-    fn test_assemble_diag_laplace_3d() {
+    fn test_assemble_pairwise_laplace_3d_f64() {
         let nsources = 19;
         let ntargets = 19;
 
@@ -1361,35 +1548,32 @@ mod test {
         let mut green_value_diag = rlst_dynamic_array1!(f64, [ntargets]);
         let mut green_value_diag_deriv = rlst_dynamic_array2!(f64, [4, ntargets]);
 
-        Laplace3dKernel::<f64>::default().assemble_diagonal_st(
+        Laplace3dKernel::<f64>::default().assemble_pairwise_st(
             EvalType::Value,
             sources.data(),
             targets.data(),
             green_value_diag.data_mut(),
         );
-        Laplace3dKernel::<f64>::default().assemble_diagonal_st(
+        Laplace3dKernel::<f64>::default().assemble_pairwise_st(
             EvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_diag_deriv.data_mut(),
         );
 
-        let mut green_value_t = rlst_dynamic_array2!(f64, [nsources, ntargets]);
+        let mut green_value = rlst_dynamic_array2!(f64, [nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::Value,
             sources.data(),
             targets.data(),
-            green_value_t.data_mut(),
+            green_value.data_mut(),
         );
 
         // The matrix needs to be transposed so that the first row corresponds to the first target,
         // second row to the second target and so on.
 
-        let mut green_value = rlst_dynamic_array2!(f64, [ntargets, nsources]);
-        green_value.fill_from(green_value_t.transpose());
-
-        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * ntargets, nsources]);
+        let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
             EvalType::ValueDeriv,
@@ -1398,7 +1582,86 @@ mod test {
             green_value_deriv.data_mut(),
         );
 
-        // The matrix needs to be transposed so that the first row corresponds to the first target, etc.
+        for index in 0..nsources {
+            assert_relative_eq!(
+                green_value[[index, index]],
+                green_value_diag[[index]],
+                epsilon = 1E-12
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index, index]],
+                green_value_diag_deriv[[0, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 1, index]],
+                green_value_diag_deriv[[1, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 2, index]],
+                green_value_diag_deriv[[2, index]],
+                epsilon = 1E-12,
+            );
+
+            assert_relative_eq!(
+                green_value_deriv[[4 * index + 3, index]],
+                green_value_diag_deriv[[3, index]],
+                epsilon = 1E-12,
+            );
+        }
+    }
+
+    #[test]
+    fn test_assemble_pairwise_laplace_3d_f32() {
+        let nsources = 19;
+        let ntargets = 19;
+
+        let mut sources = rlst_dynamic_array2!(f32, [nsources, 3]);
+        let mut targets = rlst_dynamic_array2!(f32, [ntargets, 3]);
+
+        sources.fill_from_seed_equally_distributed(1);
+        targets.fill_from_seed_equally_distributed(2);
+
+        let mut green_value_diag = rlst_dynamic_array1!(f32, [ntargets]);
+        let mut green_value_diag_deriv = rlst_dynamic_array2!(f32, [4, ntargets]);
+
+        Laplace3dKernel::<f32>::default().assemble_pairwise_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value_diag.data_mut(),
+        );
+        Laplace3dKernel::<f32>::default().assemble_pairwise_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_diag_deriv.data_mut(),
+        );
+
+        let mut green_value = rlst_dynamic_array2!(f32, [nsources, ntargets]);
+
+        Laplace3dKernel::<f32>::default().assemble_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            green_value.data_mut(),
+        );
+
+        // The matrix needs to be transposed so that the first row corresponds to the first target,
+        // second row to the second target and so on.
+
+        let mut green_value_deriv = rlst_dynamic_array2!(f32, [4 * nsources, ntargets]);
+
+        Laplace3dKernel::<f32>::default().assemble_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            green_value_deriv.data_mut(),
+        );
 
         for index in 0..nsources {
             assert_relative_eq!(
