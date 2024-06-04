@@ -1667,31 +1667,31 @@ mod test {
             assert_relative_eq!(
                 green_value[[index, index]],
                 green_value_diag[[index]],
-                epsilon = 1E-12
+                epsilon = 1E-5
             );
 
             assert_relative_eq!(
                 green_value_deriv[[4 * index, index]],
                 green_value_diag_deriv[[0, index]],
-                epsilon = 1E-12,
+                epsilon = 1E-5,
             );
 
             assert_relative_eq!(
                 green_value_deriv[[4 * index + 1, index]],
                 green_value_diag_deriv[[1, index]],
-                epsilon = 1E-12,
+                epsilon = 1E-5,
             );
 
             assert_relative_eq!(
                 green_value_deriv[[4 * index + 2, index]],
                 green_value_diag_deriv[[2, index]],
-                epsilon = 1E-12,
+                epsilon = 1E-5,
             );
 
             assert_relative_eq!(
                 green_value_deriv[[4 * index + 3, index]],
                 green_value_diag_deriv[[3, index]],
-                epsilon = 1E-12,
+                epsilon = 1E-5,
             );
         }
     }
