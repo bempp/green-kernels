@@ -57,3 +57,17 @@ lapack-src = { version = "0.10", features = ["netlib"]}
 name = "laplace_f32"
 harness = false
 
+[[bench]]
+name = "laplace_f64"
+harness = false
+
+[[bench]]
+name = "helmholtz_c32"
+harness = false
+
+[[bench]]
+name = "helmholtz_c64"
+harness = false
+
+
+
