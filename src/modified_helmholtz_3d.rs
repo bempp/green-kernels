@@ -53,7 +53,9 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
                     targets[3 * target_index + 2],
                 ];
 
-                evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
+                evaluate_modified_helmholtz_one_target(
+                    eval_type, &target, sources, charges, self.omega, my_chunk,
+                )
             });
     }
 
@@ -78,7 +80,9 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
                     targets[3 * target_index + 2],
                 ];
 
-                evaluate_laplace_one_target(eval_type, &target, sources, charges, my_chunk)
+                evaluate_modified_helmholtz_one_target(
+                    eval_type, &target, sources, charges, self.omega, my_chunk,
+                )
             });
     }
 
@@ -501,11 +505,12 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 }
 
 /// Evaluate laplce kernel with one target
-pub fn evaluate_laplace_one_target<T: RlstScalar>(
+pub fn evaluate_modified_helmholtz_one_target<T: RlstScalar>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
     charges: &[T],
+    omega: T,
     result: &mut [T],
 ) {
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
@@ -513,6 +518,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
     match eval_type {
         EvalType::Value => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
+                omega: T,
                 t0: T,
                 t1: T,
                 t2: T,
@@ -529,6 +535,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                     use coe::Coerce;
 
                     let Self {
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -542,6 +549,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
 
                     fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
                         simd: S,
+                        omega: T,
                         t0: T,
                         t1: T,
                         t2: T,
@@ -572,18 +580,26 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                             );
 
                             let is_zero = simd.cmp_eq(square_sum, zero);
-                            let inv_abs =
+                            let inv_diff_norm =
                                 simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
 
-                            acc = simd.mul_add(inv_abs, c, acc);
+                            let diff_norm = simd.mul(inv_diff_norm, square_sum);
+
+                            let romega = simd.mul(simd.splat(omega), diff_norm);
+
+                            let green = simd.mul(simd.exp(simd.neg(romega)), inv_diff_norm);
+
+                            acc = simd.mul_add(green, c, acc);
                         }
 
                         simd.reduce_add(acc)
                     }
 
-                    let acc0 = impl_slice::<T, S>(simd, t0, t1, t2, sources_head, charges_head);
+                    let acc0 =
+                        impl_slice::<T, S>(simd, omega, t0, t1, t2, sources_head, charges_head);
                     let acc1 = impl_slice::<T, pulp::Scalar>(
                         pulp::Scalar::new(),
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -599,6 +615,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
             use coe::Coerce;
             if coe::is_same::<T, f32>() {
                 let acc = pulp::Arch::new().dispatch(Impl::<'_, f32> {
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -608,6 +625,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                 result[0] += T::from_real(to::<_, T::Real>(acc)).mul_real(m_inv_4pi);
             } else if coe::is_same::<T, f64>() {
                 let acc = pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -621,6 +639,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
         }
         EvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
+                omega: T,
                 t0: T,
                 t1: T,
                 t2: T,
@@ -637,6 +656,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                     use coe::Coerce;
 
                     let Self {
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -650,6 +670,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
 
                     fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
                         simd: S,
+                        omega: T,
                         t0: T,
                         t1: T,
                         t2: T,
@@ -683,15 +704,24 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                             );
 
                             let is_zero = simd.cmp_eq(square_sum, zero);
-                            let inv_abs =
+                            let inv_diff_norm =
                                 simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
 
-                            let inv_abs_cube = simd.mul(inv_abs, simd.mul(inv_abs, inv_abs));
+                            let diff_norm = simd.mul(inv_diff_norm, square_sum);
 
-                            acc0 = simd.mul_add(inv_abs, c, acc0);
-                            acc1 = simd.mul_add(diff0, simd.mul(c, inv_abs_cube), acc1);
-                            acc2 = simd.mul_add(diff1, simd.mul(c, inv_abs_cube), acc2);
-                            acc3 = simd.mul_add(diff2, simd.mul(c, inv_abs_cube), acc3);
+                            let romega = simd.mul(simd.splat(omega), diff_norm);
+
+                            let green = simd.mul(simd.exp(simd.neg(romega)), inv_diff_norm);
+
+                            let deriv_first_factor = simd.mul(
+                                simd.mul(green, simd.add(simd.splat(T::one()), romega)),
+                                simd.mul(inv_diff_norm, inv_diff_norm),
+                            );
+
+                            acc0 = simd.mul_add(green, c, acc0);
+                            acc1 = simd.mul_add(diff0, simd.mul(c, deriv_first_factor), acc1);
+                            acc2 = simd.mul_add(diff1, simd.mul(c, deriv_first_factor), acc2);
+                            acc3 = simd.mul_add(diff2, simd.mul(c, deriv_first_factor), acc3);
                         }
 
                         [
@@ -702,9 +732,11 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                         ]
                     }
 
-                    let acc0 = impl_slice::<T, S>(simd, t0, t1, t2, sources_head, charges_head);
+                    let acc0 =
+                        impl_slice::<T, S>(simd, omega, t0, t1, t2, sources_head, charges_head);
                     let acc1 = impl_slice::<T, pulp::Scalar>(
                         pulp::Scalar::new(),
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -725,6 +757,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
             use coe::Coerce;
             if coe::is_same::<T, f32>() {
                 let acc = pulp::Arch::new().dispatch(Impl::<'_, f32> {
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -737,6 +770,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                 result[3] += T::from_real(to::<_, T::Real>(acc[3])).mul_real(m_inv_4pi);
             } else if coe::is_same::<T, f64>() {
                 let acc = pulp::Arch::new().dispatch(Impl::<'_, f64> {
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -1214,4 +1248,84 @@ mod test {
     }
     impl_modified_helmholtz_tests!(f32, 1E-4, 1E-2, 1E-5);
     impl_modified_helmholtz_tests!(f64, 1E-8, 1E-4, 1E-13);
+
+    #[test]
+    fn test_modified_helmholtz_evaluate() {
+        let eps = 1E-5;
+        let omega = 1.5;
+
+        let nsources = 53;
+        let ntargets = 47;
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+
+        let mut sources = rlst_dynamic_array2!(f32, [3, nsources]);
+        let mut targets = rlst_dynamic_array2!(f32, [3, ntargets]);
+        let mut charges = rlst_dynamic_array1!(f32, [nsources]);
+
+        sources.fill_from_equally_distributed(&mut rng);
+        targets.fill_from_equally_distributed(&mut rng);
+        charges.fill_from_equally_distributed(&mut rng);
+
+        // Evaluate expected contribution.
+
+        let mut expected_value = rlst_dynamic_array1!(f32, [ntargets]);
+        let mut expected_value_deriv = rlst_dynamic_array2!(f32, [4, ntargets]);
+
+        for (e_val, target, mut e_val_deriv) in izip!(
+            expected_value.iter_mut(),
+            targets.col_iter(),
+            expected_value_deriv.col_iter_mut()
+        ) {
+            for (source, charge) in izip!(sources.col_iter(), charges.iter()) {
+                let mut res_val = [0.0];
+                let mut res_val_deriv = [0.0; 4];
+                ModifiedHelmholtz3dKernel::<f32>::new(omega).greens_fct(
+                    EvalType::Value,
+                    source.data(),
+                    target.data(),
+                    res_val.as_mut_slice(),
+                );
+                ModifiedHelmholtz3dKernel::<f32>::new(omega).greens_fct(
+                    EvalType::ValueDeriv,
+                    source.data(),
+                    target.data(),
+                    res_val_deriv.as_mut_slice(),
+                );
+
+                *e_val += charge * res_val[0];
+
+                for (&r, e) in izip!(res_val_deriv.iter(), e_val_deriv.iter_mut()) {
+                    *e += charge * r;
+                }
+            }
+        }
+
+        // Now compute the actual contribution
+
+        let mut actual_value = rlst_dynamic_array1!(f32, [ntargets]);
+        let mut actual_value_deriv = rlst_dynamic_array2!(f32, [4, ntargets]);
+
+        ModifiedHelmholtz3dKernel::<f32>::new(omega).evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            charges.data(),
+            actual_value.data_mut(),
+        );
+        ModifiedHelmholtz3dKernel::<f32>::new(omega).evaluate_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            charges.data(),
+            actual_value_deriv.data_mut(),
+        );
+
+        for (a, e) in izip!(actual_value.iter(), expected_value.iter()) {
+            assert_relative_eq!(a, e, max_relative = eps);
+        }
+        for (a, e) in izip!(actual_value_deriv.iter(), expected_value_deriv.iter()) {
+            assert_relative_eq!(a, e, max_relative = eps);
+        }
+    }
 }
