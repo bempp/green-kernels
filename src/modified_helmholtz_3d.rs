@@ -107,7 +107,9 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
                     targets[3 * target_index + 2],
                 ];
 
-                assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+                assemble_modified_helmholtz_one_target(
+                    eval_type, &target, sources, self.omega, my_chunk,
+                )
             });
     }
 
@@ -132,7 +134,9 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
                     targets[3 * target_index + 2],
                 ];
 
-                assemble_laplace_one_target(eval_type, &target, sources, my_chunk)
+                assemble_modified_helmholtz_one_target(
+                    eval_type, &target, sources, self.omega, my_chunk,
+                )
             });
     }
 
@@ -394,7 +398,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
     }
 
     fn range_component_count(&self, eval_type: EvalType) -> usize {
-        laplace_component_count(eval_type)
+        modified_helmholtz_component_count(eval_type)
     }
 
     #[inline(always)]
@@ -788,11 +792,12 @@ pub fn evaluate_modified_helmholtz_one_target<T: RlstScalar>(
     }
 }
 
-/// Assemble Laplace kernel with one target
-pub fn assemble_laplace_one_target<T: RlstScalar>(
+/// Assemble modified Helmholtz kernel with one target
+pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
     eval_type: EvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
+    omega: T,
     result: &mut [T],
 ) {
     assert_eq!(sources.len() % 3, 0);
@@ -803,6 +808,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
         EvalType::Value => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 m_inv_4pi: T,
+                omega: T,
                 t0: T,
                 t1: T,
                 t2: T,
@@ -820,6 +826,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
 
                     let Self {
                         m_inv_4pi,
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -834,6 +841,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                     fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
                         simd: S,
                         m_inv_4pi: T,
+                        omega: T,
                         t0: T,
                         t1: T,
                         t2: T,
@@ -862,20 +870,35 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                                 diff0,
                                 simd.mul_add(diff1, diff1, simd.mul(diff2, diff2)),
                             );
-
                             let is_zero = simd.cmp_eq(square_sum, zero);
-                            *r = simd.select(
-                                is_zero,
-                                zero,
-                                simd.mul(simd.approx_recip_sqrt(square_sum), m_inv_4pi),
+                            let inv_diff_norm =
+                                simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
+
+                            let diff_norm = simd.mul(inv_diff_norm, square_sum);
+
+                            let romega = simd.mul(simd.splat(omega), diff_norm);
+
+                            *r = simd.mul(
+                                simd.exp(simd.neg(romega)),
+                                simd.mul(inv_diff_norm, m_inv_4pi),
                             );
                         }
                     }
 
-                    impl_slice::<T, S>(simd, m_inv_4pi, t0, t1, t2, sources_head, result_head);
+                    impl_slice::<T, S>(
+                        simd,
+                        m_inv_4pi,
+                        omega,
+                        t0,
+                        t1,
+                        t2,
+                        sources_head,
+                        result_head,
+                    );
                     impl_slice::<T, pulp::Scalar>(
                         pulp::Scalar::new(),
                         m_inv_4pi,
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -890,6 +913,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
             if coe::is_same::<T, f32>() {
                 pulp::Arch::new().dispatch(Impl::<'_, f32> {
                     m_inv_4pi: to(m_inv_4pi),
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -899,6 +923,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
             } else if coe::is_same::<T, f64>() {
                 pulp::Arch::new().dispatch(Impl::<'_, f64> {
                     m_inv_4pi: to(m_inv_4pi),
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -912,6 +937,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
         EvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 m_inv_4pi: T,
+                omega: T,
                 t0: T,
                 t1: T,
                 t2: T,
@@ -929,6 +955,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
 
                     let Self {
                         m_inv_4pi,
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -944,6 +971,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                     fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
                         simd: S,
                         m_inv_4pi: T,
+                        omega: T,
                         t0: T,
                         t1: T,
                         t2: T,
@@ -974,25 +1002,47 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                             );
 
                             let is_zero = simd.cmp_eq(square_sum, zero);
-                            let inv_abs =
+                            let inv_diff_norm =
                                 simd.select(is_zero, zero, simd.approx_recip_sqrt(square_sum));
 
-                            let inv_abs_cube = simd.mul(inv_abs, simd.mul(inv_abs, inv_abs));
+                            let diff_norm = simd.mul(inv_diff_norm, square_sum);
 
-                            r[0] = simd.mul(inv_abs, m_inv_4pi);
-                            r[1] = simd.mul(diff0, simd.mul(inv_abs_cube, m_inv_4pi));
-                            r[2] = simd.mul(diff1, simd.mul(inv_abs_cube, m_inv_4pi));
-                            r[3] = simd.mul(diff2, simd.mul(inv_abs_cube, m_inv_4pi));
+                            let romega = simd.mul(simd.splat(omega), diff_norm);
+
+                            let green = simd.mul(
+                                simd.exp(simd.neg(romega)),
+                                simd.mul(inv_diff_norm, m_inv_4pi),
+                            );
+
+                            let deriv_first_factor = simd.mul(
+                                simd.mul(green, simd.add(simd.splat(T::one()), romega)),
+                                simd.mul(inv_diff_norm, inv_diff_norm),
+                            );
+
+                            r[0] = green;
+                            r[1] = simd.mul(diff0, deriv_first_factor);
+                            r[2] = simd.mul(diff1, deriv_first_factor);
+                            r[3] = simd.mul(diff2, deriv_first_factor);
 
                             *r = simd.interleave(*r);
                         }
                     }
 
                     // impl_slice::<T, S>(simd, m_inv_4pi, t0, t1, t2, sources_head, result_head);
-                    impl_slice::<T, S>(simd, m_inv_4pi, t0, t1, t2, sources_head, result_head);
+                    impl_slice::<T, S>(
+                        simd,
+                        m_inv_4pi,
+                        omega,
+                        t0,
+                        t1,
+                        t2,
+                        sources_head,
+                        result_head,
+                    );
                     impl_slice::<T, pulp::Scalar>(
                         pulp::Scalar::new(),
                         m_inv_4pi,
+                        omega,
                         t0,
                         t1,
                         t2,
@@ -1007,6 +1057,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
             if coe::is_same::<T, f32>() {
                 pulp::Arch::new().dispatch(Impl::<'_, f32> {
                     m_inv_4pi: to(m_inv_4pi),
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -1016,6 +1067,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
             } else if coe::is_same::<T, f64>() {
                 pulp::Arch::new().dispatch(Impl::<'_, f64> {
                     m_inv_4pi: to(m_inv_4pi),
+                    omega: to(omega),
                     t0: to(target[0]),
                     t1: to(target[1]),
                     t2: to(target[2]),
@@ -1029,7 +1081,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
     }
 }
 
-fn laplace_component_count(eval_type: EvalType) -> usize {
+fn modified_helmholtz_component_count(eval_type: EvalType) -> usize {
     match eval_type {
         EvalType::Value => 1,
         EvalType::ValueDeriv => 4,
@@ -1322,6 +1374,74 @@ mod test {
         }
     }
 
+    #[test]
+    fn [<test_modified_helmholtz_assemble_ $scalar>]() {
+        let eps = $eps;
+        let omega = 1.5;
+
+        let nsources = 53;
+        let ntargets = 47;
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+
+        let mut sources = rlst_dynamic_array2!($scalar, [3, nsources]);
+        let mut targets = rlst_dynamic_array2!($scalar, [3, ntargets]);
+
+        sources.fill_from_equally_distributed(&mut rng);
+        targets.fill_from_equally_distributed(&mut rng);
+
+        // Now compute the actual contribution
+
+        let mut actual_value = rlst_dynamic_array2!($scalar, [nsources, ntargets]);
+        let mut actual_value_deriv = rlst_dynamic_array2!($scalar, [4 * nsources, ntargets]);
+
+        ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_st(
+            EvalType::Value,
+            sources.data(),
+            targets.data(),
+            actual_value.data_mut(),
+        );
+        ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_st(
+            EvalType::ValueDeriv,
+            sources.data(),
+            targets.data(),
+            actual_value_deriv.data_mut(),
+        );
+
+        // Evaluate expected contribution.
+
+        for (target_index, target) in targets.col_iter().enumerate() {
+            for (source_index, source) in sources.col_iter().enumerate() {
+                let mut expected_val = [0.0];
+                let mut expected_val_deriv = [0.0; 4];
+                ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
+                    EvalType::Value,
+                    source.data(),
+                    target.data(),
+                    expected_val.as_mut_slice(),
+                );
+                ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
+                    EvalType::ValueDeriv,
+                    source.data(),
+                    target.data(),
+                    expected_val_deriv.as_mut_slice(),
+                );
+
+                assert_relative_eq!(
+                    expected_val[0],
+                    actual_value[[source_index, target_index]],
+                    max_relative = eps
+                );
+                for index in 0..4 {
+                    assert_relative_eq!(
+                        expected_val_deriv[index],
+                        actual_value_deriv[[4 * source_index + index, target_index]],
+                        max_relative = eps
+                    );
+                }
+            }
+        }
+    }
                     }
         };
     }
