@@ -29,14 +29,14 @@ num = "0.4"
 num_cpus = "1"
 rlst = { version = "0.2", features = ["sleef"] }
 rand = "0.8.5"
-itertools = { version = "0.12.1", default-features = false }
+itertools = { version = "0.13.0", default-features = false }
 coe-rs = "0.1.2"
 pulp = { version = "0.18.12" }
 bytemuck = "1.16.0"
 hexf = "0.2.1"
 
 [dev-dependencies]
-criterion = { version = "0.3", features = ["html_reports"] }
+criterion = { version = "0.5.1", features = ["html_reports"] }
 rand_chacha = "0.3"
 
 [package.metadata.docs.rs]
