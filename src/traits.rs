@@ -62,10 +62,12 @@ pub trait Kernel: Sync {
     ///            the value for each dimension must be continuously contained in the slice.
     /// - `targets`: A slice defining the targets. The memory layout is the same as for sources.
     /// - `result`: The result array. If the kernel is RlstScalar and `eval_type` has the value [EvalType::Value]
-    ///           then `result` has MxN elements with M the number of targets and N the number of targets.
-    ///           For a RlstScalar kernel in three dimensional space if [EvalType::ValueDeriv] was chosen then `result` contains
-    ///           in consecutive order the interaction of all sources with the first target and then the corresponding derivatives,
-    ///           followed by the interactions with the second target, and so on. See the example for illustration.
+    ///           then `result` is equivalent to a column major matrix of dimension [S, T], where S is the number of sources and
+    ///           T is the number of targets. Hence, for each target all corresponding source evaluations are consecutively in memory.
+    ///           For a RlstScalar kernel in three dimensional space if [EvalType::ValueDeriv] was chosen then `result` is equivalent
+    ///           to a column-major matrix of dimension [4 * S, T], where the first 4 rows are the values of Green's fct. value and
+    ///           derivatives for the first source and all targets. The next 4 rows correspond to values and derivatives of second source
+    ///           with all targets and so on.
     ///
     fn assemble_st(
         &self,
@@ -85,7 +87,7 @@ pub trait Kernel: Sync {
     );
 
     /// Single threaded assembly of the diagonal of a kernel matrix
-    fn assemble_diagonal_st(
+    fn assemble_pairwise_st(
         &self,
         eval_type: EvalType,
         sources: &[<Self::T as RlstScalar>::Real],
