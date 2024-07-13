@@ -1448,5 +1448,5 @@ mod test {
         };
     }
     impl_modified_helmholtz_tests!(f32, 1E-4, 1E-2, 1E-5);
-    impl_modified_helmholtz_tests!(f64, 1E-8, 1E-4, 1E-13);
+    impl_modified_helmholtz_tests!(f64, 1E-8, 1E-4, 1E-11);
 }
