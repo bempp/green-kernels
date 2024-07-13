@@ -1655,8 +1655,8 @@ mod test {
 
                 Helmholtz3dKernel::<c64>::new(wavenumber).greens_fct(
                     EvalType::Value,
-                    &source.data(),
-                    &target.data(),
+                    source.data(),
+                    target.data(),
                     expected.as_mut_slice(),
                 );
 
@@ -1700,8 +1700,8 @@ mod test {
 
                 Helmholtz3dKernel::<c32>::new(wavenumber).greens_fct(
                     EvalType::Value,
-                    &source.data(),
-                    &target.data(),
+                    source.data(),
+                    target.data(),
                     expected.as_mut_slice(),
                 );
 
@@ -1750,8 +1750,8 @@ mod test {
 
                 Helmholtz3dKernel::<c32>::new(wavenumber).greens_fct(
                     EvalType::ValueDeriv,
-                    &source.data(),
-                    &target.data(),
+                    source.data(),
+                    target.data(),
                     expected.as_mut_slice(),
                 );
 
@@ -1802,8 +1802,8 @@ mod test {
 
                 Helmholtz3dKernel::<c64>::new(wavenumber).greens_fct(
                     EvalType::ValueDeriv,
-                    &source.data(),
-                    &target.data(),
+                    source.data(),
+                    target.data(),
                     expected.as_mut_slice(),
                 );
 
