@@ -1084,6 +1084,7 @@ pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                     let result: &mut [[T::Real; 2]] = bytemuck::cast_slice_mut(result);
                     let (result_head, result_tail) = <T::Real>::as_simd_slice_from_vec_mut(result);
 
+                    #[allow(clippy::too_many_arguments)]
                     fn impl_slice<T: RlstScalar<Complex = T>, S: pulp::Simd>(
                         simd: S,
                         m_inv_4pi: T::Real,
@@ -1228,6 +1229,7 @@ pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                     let result: &mut [[T::Real; 8]] = bytemuck::cast_slice_mut(result);
                     let (result_head, result_tail) = <T::Real>::as_simd_slice_from_vec_mut(result);
 
+                    #[allow(clippy::too_many_arguments)]
                     fn impl_slice<T: RlstScalar<Complex = T>, S: pulp::Simd>(
                         simd: S,
                         m_inv_4pi: T::Real,

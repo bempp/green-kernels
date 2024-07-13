@@ -838,6 +838,7 @@ pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
                     let (sources_head, sources_tail) = T::as_simd_slice_from_vec(sources);
                     let (result_head, result_tail) = T::as_simd_slice_mut(result);
 
+                    #[allow(clippy::too_many_arguments)]
                     fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
                         simd: S,
                         m_inv_4pi: T,
@@ -968,6 +969,7 @@ pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
                     let (result, _) = pulp::as_arrays_mut::<4, T>(result);
                     let (result_head, result_tail) = T::as_simd_slice_from_vec_mut::<_, 4>(result);
 
+                    #[allow(clippy::too_many_arguments)]
                     fn impl_slice<T: RlstScalar<Real = T> + RlstSimd, S: pulp::Simd>(
                         simd: S,
                         m_inv_4pi: T,
