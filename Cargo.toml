@@ -53,6 +53,7 @@ lapack-src = { version = "0.10", features = ["accelerate"]}
 blas-src = { version = "0.10", features = ["blis"]}
 lapack-src = { version = "0.10", features = ["netlib"]}
 
+
 [[bench]]
 name = "laplace_f32"
 harness = false
