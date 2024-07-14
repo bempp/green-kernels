@@ -5,7 +5,7 @@ strict = []
 
 [package]
 name = "green-kernels"
-version = "0.1.0-dev"
+version = "0.2.0"
 edition = "2021"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 description = "Evaluation of Green's function kernels."

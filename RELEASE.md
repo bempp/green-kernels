@@ -17,7 +17,8 @@ To make a new release of green-kernels, follow the following steps:
    If you are releasing a minor version, you should increment `[y]` and set `[z]`
    to zero. If you are releasing a bugfix, you should increment `[z]`.
 
-3) In `Cargo.toml`, check that the `rlst` dependency is at the latest version.
+3) Commit your changes and push to GitHub, and check that all the tests on CI pass.
+   In `Cargo.toml`, check that the `rlst` dependency is at the latest version.
 
 4) Commit your changes and push to GitHub, and check that all the tests on CI pass.
 
