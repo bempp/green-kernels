@@ -2,6 +2,7 @@
 
 /// Evaluation Mode
 #[derive(Clone, Copy)]
+#[repr(C)]
 pub enum EvalType {
     /// Only values required
     Value,
