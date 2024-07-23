@@ -7,7 +7,7 @@ use rlst::{dense::tools::RandScalar, prelude::*};
 
 use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel,
-    modified_helmholtz_3d::ModifiedHelmholtz3dKernel, traits::Kernel, types::EvalType,
+    modified_helmholtz_3d::ModifiedHelmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType,
 };
 
 fn benchmark_kernel_laplace<T: RlstScalar + RandScalar, K: Kernel<T = T>>(
@@ -21,7 +21,7 @@ where
     let mut result = rlst_dynamic_array2!(T, [NSAMPLES, NSAMPLES]);
 
     kernel.assemble_mt(
-        EvalType::Value,
+        GreenKernelEvalType::Value,
         sources.data(),
         targets.data(),
         result.data_mut(),
@@ -56,7 +56,7 @@ where
     let mut result = rlst_dynamic_array2!(T, [NSAMPLES, NSAMPLES]);
 
     kernel.assemble_mt(
-        EvalType::Value,
+        GreenKernelEvalType::Value,
         sources.data(),
         targets.data(),
         result.data_mut(),
@@ -92,7 +92,7 @@ where
     let mut result = rlst_dynamic_array2!(T, [NSAMPLES, NSAMPLES]);
 
     kernel.assemble_mt(
-        EvalType::Value,
+        GreenKernelEvalType::Value,
         sources.data(),
         targets.data(),
         result.data_mut(),

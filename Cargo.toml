@@ -18,7 +18,7 @@ categories = ["mathematics", "science"]
 
 [lib]
 name = "green_kernels"
-crate-type = ["lib", "cdylib"]
+crate-type = ["lib", "staticlib", "cdylib"]
 
 [dependencies]
 paste = "1.*"

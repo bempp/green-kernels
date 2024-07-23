@@ -3,7 +3,7 @@
 /// Evaluation Mode
 #[derive(Clone, Copy)]
 #[repr(C)]
-pub enum EvalType {
+pub enum GreenKernelEvalType {
     /// Only values required
     Value,
     /// Both values and derivatives required
