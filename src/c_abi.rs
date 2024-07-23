@@ -10,10 +10,10 @@ use crate::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalT
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub enum GreenKernelCType {
-    GreenKernelF32,
-    GreenKernelF64,
-    GreenKernelC32,
-    GreenKernelC64,
+    F32,
+    F64,
+    C32,
+    C64,
 }
 
 pub struct GreenKernelEvaluator {
@@ -35,16 +35,16 @@ impl Drop for GreenKernelEvaluator {
     fn drop(&mut self) {
         let Self { ctype, kernel_p } = self;
         match ctype {
-            GreenKernelCType::GreenKernelF32 => {
+            GreenKernelCType::F32 => {
                 drop(unsafe { Box::from_raw(*kernel_p as *mut Box<dyn Kernel<T = f32>>) });
             }
-            GreenKernelCType::GreenKernelF64 => {
+            GreenKernelCType::F64 => {
                 drop(unsafe { Box::from_raw(*kernel_p as *mut Box<dyn Kernel<T = f64>>) });
             }
-            GreenKernelCType::GreenKernelC32 => {
+            GreenKernelCType::C32 => {
                 drop(unsafe { Box::from_raw(*kernel_p as *mut Box<dyn Kernel<T = c32>>) });
             }
-            GreenKernelCType::GreenKernelC64 => {
+            GreenKernelCType::C64 => {
                 drop(unsafe { Box::from_raw(*kernel_p as *mut Box<dyn Kernel<T = c64>>) });
             }
         }
@@ -64,10 +64,10 @@ fn green_kernel_assert_type<T: RlstScalar>(kernel_p: *mut GreenKernelEvaluator) 
     assert!(!kernel_p.is_null());
     let ctype = green_kernel_get_ctype(kernel_p);
     match ctype {
-        GreenKernelCType::GreenKernelF32 => coe::assert_same::<f32, T>(),
-        GreenKernelCType::GreenKernelF64 => coe::assert_same::<f64, T>(),
-        GreenKernelCType::GreenKernelC32 => coe::assert_same::<c32, T>(),
-        GreenKernelCType::GreenKernelC64 => coe::assert_same::<c64, T>(),
+        GreenKernelCType::F32 => coe::assert_same::<f32, T>(),
+        GreenKernelCType::F64 => coe::assert_same::<f64, T>(),
+        GreenKernelCType::C32 => coe::assert_same::<c32, T>(),
+        GreenKernelCType::C64 => coe::assert_same::<c64, T>(),
     }
 }
 
@@ -88,7 +88,7 @@ pub extern "C" fn green_kernel_laplace_3d_alloc(
     ctype: GreenKernelCType,
 ) -> *mut GreenKernelEvaluator {
     match ctype {
-        GreenKernelCType::GreenKernelF32 => {
+        GreenKernelCType::F32 => {
             let evaluator = Box::new(GreenKernelEvaluator {
                 ctype,
                 kernel_p: Box::into_raw(Box::new(
@@ -97,7 +97,7 @@ pub extern "C" fn green_kernel_laplace_3d_alloc(
             });
             Box::into_raw(evaluator)
         }
-        GreenKernelCType::GreenKernelF64 => {
+        GreenKernelCType::F64 => {
             let evaluator = Box::new(GreenKernelEvaluator {
                 ctype,
                 kernel_p: Box::into_raw(Box::new(
@@ -155,7 +155,7 @@ pub extern "C" fn green_kernel_evaluate(
     assert!(!kernel_p.is_null());
 
     match green_kernel_get_ctype(kernel_p) {
-        GreenKernelCType::GreenKernelF32 => {
+        GreenKernelCType::F32 => {
             impl_evaluate::<f32>(
                 kernel_p,
                 eval_type,
@@ -169,7 +169,7 @@ pub extern "C" fn green_kernel_evaluate(
                 multithreaded,
             );
         }
-        GreenKernelCType::GreenKernelF64 => {
+        GreenKernelCType::F64 => {
             impl_evaluate::<f64>(
                 kernel_p,
                 eval_type,
@@ -183,7 +183,7 @@ pub extern "C" fn green_kernel_evaluate(
                 multithreaded,
             );
         }
-        GreenKernelCType::GreenKernelC32 => {
+        GreenKernelCType::C32 => {
             impl_evaluate::<c32>(
                 kernel_p,
                 eval_type,
@@ -197,7 +197,7 @@ pub extern "C" fn green_kernel_evaluate(
                 multithreaded,
             );
         }
-        GreenKernelCType::GreenKernelC64 => {
+        GreenKernelCType::C64 => {
             impl_evaluate::<c64>(
                 kernel_p,
                 eval_type,
@@ -221,16 +221,16 @@ pub extern "C" fn green_kernel_range_component_count(
 ) -> u32 {
     assert!(!kernel_p.is_null());
     match green_kernel_get_ctype(kernel_p) {
-        GreenKernelCType::GreenKernelF32 => {
+        GreenKernelCType::F32 => {
             green_kernel_inner::<f32>(kernel_p).range_component_count(eval_type) as u32
         }
-        GreenKernelCType::GreenKernelF64 => {
+        GreenKernelCType::F64 => {
             green_kernel_inner::<f64>(kernel_p).range_component_count(eval_type) as u32
         }
-        GreenKernelCType::GreenKernelC32 => {
+        GreenKernelCType::C32 => {
             green_kernel_inner::<c32>(kernel_p).range_component_count(eval_type) as u32
         }
-        GreenKernelCType::GreenKernelC64 => {
+        GreenKernelCType::C64 => {
             green_kernel_inner::<c64>(kernel_p).range_component_count(eval_type) as u32
         }
     }
@@ -243,11 +243,8 @@ mod test {
 
     #[test]
     fn test_create_laplace_evaluator() {
-        let evaluator = green_kernel_laplace_3d_alloc(GreenKernelCType::GreenKernelF32);
-        assert_eq!(
-            GreenKernelCType::GreenKernelF32,
-            green_kernel_get_ctype(evaluator)
-        );
+        let evaluator = green_kernel_laplace_3d_alloc(GreenKernelCType::F32);
+        assert_eq!(GreenKernelCType::F32, green_kernel_get_ctype(evaluator));
 
         green_kernel_free(evaluator);
     }

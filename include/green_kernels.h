@@ -4,10 +4,10 @@
 #include <stdlib.h>
 
 typedef enum GreenKernelCType {
-  GreenKernelF32,
-  GreenKernelF64,
-  GreenKernelC32,
-  GreenKernelC64,
+  GreenKernelCType_F32,
+  GreenKernelCType_F64,
+  GreenKernelCType_C32,
+  GreenKernelCType_C64,
 } GreenKernelCType;
 
 /**
@@ -17,11 +17,11 @@ typedef enum GreenKernelEvalType {
   /**
    * Only values required
    */
-  Value,
+  GreenKernelEvalType_Value,
   /**
    * Both values and derivatives required
    */
-  ValueDeriv,
+  GreenKernelEvalType_ValueDeriv,
 } GreenKernelEvalType;
 
 typedef struct GreenKernelEvaluator GreenKernelEvaluator;

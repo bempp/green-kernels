@@ -18,7 +18,7 @@ int main() {
   bool multithreaded = true;
 
   // Instantiate a Laplace evaluator
-  GreenKernelEvaluator* evaluator = green_kernel_laplace_3d_alloc(GreenKernelF64);
+  GreenKernelEvaluator* evaluator = green_kernel_laplace_3d_alloc(GreenKernelCType_F64);
 
   // Create random sources, targets, and charges
   double* sources = (double*) malloc(3 * NSOURCES * sizeof(double));
@@ -42,7 +42,7 @@ int main() {
     result[i] = 0;
   }
 
-  green_kernel_evaluate(evaluator, Value, NSOURCES, NTARGETS, sources, targets, charges, result, 3, multithreaded);
+  green_kernel_evaluate(evaluator, GreenKernelEvalType_Value, NSOURCES, NTARGETS, sources, targets, charges, result, 3, multithreaded);
 
   printf("The potential at the first target is: %e \n", result[0]);
 
