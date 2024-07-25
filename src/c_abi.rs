@@ -120,7 +120,6 @@ pub extern "C" fn green_kernel_evaluate(
     targets: *const c_void,
     charges: *const c_void,
     result: *mut c_void,
-    dim: usize,
     multithreaded: bool,
 ) {
     fn impl_evaluate<T: RlstScalar>(
@@ -132,12 +131,11 @@ pub extern "C" fn green_kernel_evaluate(
         targets: *const c_void,
         charges: *const c_void,
         result: *const c_void,
-        dim: usize,
         multithreaded: bool,
     ) {
-        green_kernel_assert_type::<T>(kernel_p);
         let kernel = green_kernel_inner::<T>(kernel_p);
         let range_count = kernel.range_component_count(eval_type);
+        let dim = green_kernel_space_dimension(kernel_p) as usize;
         let sources: &[T::Real] =
             unsafe { std::slice::from_raw_parts(sources as *const T::Real, nsources * dim) };
         let targets: &[T::Real] =
@@ -165,7 +163,6 @@ pub extern "C" fn green_kernel_evaluate(
                 targets,
                 charges,
                 result,
-                dim,
                 multithreaded,
             );
         }
@@ -179,7 +176,6 @@ pub extern "C" fn green_kernel_evaluate(
                 targets,
                 charges,
                 result,
-                dim,
                 multithreaded,
             );
         }
@@ -193,7 +189,6 @@ pub extern "C" fn green_kernel_evaluate(
                 targets,
                 charges,
                 result,
-                dim,
                 multithreaded,
             );
         }
@@ -207,7 +202,98 @@ pub extern "C" fn green_kernel_evaluate(
                 targets,
                 charges,
                 result,
-                dim,
+                multithreaded,
+            );
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn green_kernel_assemble(
+    kernel_p: *mut GreenKernelEvaluator,
+    eval_type: GreenKernelEvalType,
+    nsources: usize,
+    ntargets: usize,
+    sources: *const c_void,
+    targets: *const c_void,
+    result: *mut c_void,
+    multithreaded: bool,
+) {
+    fn impl_assemble<T: RlstScalar>(
+        kernel_p: *mut GreenKernelEvaluator,
+        eval_type: GreenKernelEvalType,
+        nsources: usize,
+        ntargets: usize,
+        sources: *const c_void,
+        targets: *const c_void,
+        result: *const c_void,
+        multithreaded: bool,
+    ) {
+        let kernel = green_kernel_inner::<T>(kernel_p);
+        let range_count = kernel.range_component_count(eval_type);
+        let dim = green_kernel_space_dimension(kernel_p) as usize;
+        let sources: &[T::Real] =
+            unsafe { std::slice::from_raw_parts(sources as *const T::Real, nsources * dim) };
+        let targets: &[T::Real] =
+            unsafe { std::slice::from_raw_parts(targets as *const T::Real, ntargets * dim) };
+        let result: &mut [T] = unsafe {
+            std::slice::from_raw_parts_mut(result as *mut T, nsources * ntargets * range_count)
+        };
+        if multithreaded {
+            kernel.assemble_mt(eval_type, sources, targets, result);
+        } else {
+            kernel.assemble_st(eval_type, sources, targets, result);
+        }
+    }
+
+    assert!(!kernel_p.is_null());
+
+    match green_kernel_get_ctype(kernel_p) {
+        GreenKernelCType::F32 => {
+            impl_assemble::<f32>(
+                kernel_p,
+                eval_type,
+                nsources,
+                ntargets,
+                sources,
+                targets,
+                result,
+                multithreaded,
+            );
+        }
+        GreenKernelCType::F64 => {
+            impl_assemble::<f64>(
+                kernel_p,
+                eval_type,
+                nsources,
+                ntargets,
+                sources,
+                targets,
+                result,
+                multithreaded,
+            );
+        }
+        GreenKernelCType::C32 => {
+            impl_assemble::<c32>(
+                kernel_p,
+                eval_type,
+                nsources,
+                ntargets,
+                sources,
+                targets,
+                result,
+                multithreaded,
+            );
+        }
+        GreenKernelCType::C64 => {
+            impl_assemble::<c64>(
+                kernel_p,
+                eval_type,
+                nsources,
+                ntargets,
+                sources,
+                targets,
+                result,
                 multithreaded,
             );
         }
@@ -232,6 +318,75 @@ pub extern "C" fn green_kernel_range_component_count(
         }
         GreenKernelCType::C64 => {
             green_kernel_inner::<c64>(kernel_p).range_component_count(eval_type) as u32
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn green_kernel_domain_component_count(kernel_p: *mut GreenKernelEvaluator) -> u32 {
+    assert!(!kernel_p.is_null());
+    match green_kernel_get_ctype(kernel_p) {
+        GreenKernelCType::F32 => {
+            green_kernel_inner::<f32>(kernel_p).domain_component_count() as u32
+        }
+        GreenKernelCType::F64 => {
+            green_kernel_inner::<f64>(kernel_p).domain_component_count() as u32
+        }
+        GreenKernelCType::C32 => {
+            green_kernel_inner::<c32>(kernel_p).domain_component_count() as u32
+        }
+        GreenKernelCType::C64 => {
+            green_kernel_inner::<c64>(kernel_p).domain_component_count() as u32
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn green_kernel_space_dimension(kernel_p: *mut GreenKernelEvaluator) -> u32 {
+    assert!(!kernel_p.is_null());
+    match green_kernel_get_ctype(kernel_p) {
+        GreenKernelCType::F32 => green_kernel_inner::<f32>(kernel_p).space_dimension() as u32,
+        GreenKernelCType::F64 => green_kernel_inner::<f64>(kernel_p).space_dimension() as u32,
+        GreenKernelCType::C32 => green_kernel_inner::<c32>(kernel_p).space_dimension() as u32,
+        GreenKernelCType::C64 => green_kernel_inner::<c64>(kernel_p).space_dimension() as u32,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn greens_fct(
+    kernel_p: *mut GreenKernelEvaluator,
+    eval_type: GreenKernelEvalType,
+    source: *const c_void,
+    target: *const c_void,
+    result: *mut c_void,
+) {
+    fn impl_greens_fct<T: RlstScalar>(
+        kernel_p: *mut GreenKernelEvaluator,
+        eval_type: GreenKernelEvalType,
+        source: *const c_void,
+        target: *const c_void,
+        result: *mut c_void,
+    ) {
+        assert!(!kernel_p.is_null());
+        let dim = green_kernel_space_dimension(kernel_p) as usize;
+        let range_components = green_kernel_range_component_count(kernel_p, eval_type) as usize;
+        let source = unsafe { std::slice::from_raw_parts(source as *const T::Real, dim) };
+        let target = unsafe { std::slice::from_raw_parts(target as *const T::Real, dim) };
+        let result = unsafe { std::slice::from_raw_parts_mut(result as *mut T, range_components) };
+        green_kernel_inner::<T>(kernel_p).greens_fct(eval_type, source, target, result);
+    }
+    match green_kernel_get_ctype(kernel_p) {
+        GreenKernelCType::F32 => {
+            impl_greens_fct::<f32>(kernel_p, eval_type, source, target, result);
+        }
+        GreenKernelCType::F64 => {
+            impl_greens_fct::<f64>(kernel_p, eval_type, source, target, result);
+        }
+        GreenKernelCType::C32 => {
+            impl_greens_fct::<c32>(kernel_p, eval_type, source, target, result);
+        }
+        GreenKernelCType::C64 => {
+            impl_greens_fct::<c64>(kernel_p, eval_type, source, target, result);
         }
     }
 }
