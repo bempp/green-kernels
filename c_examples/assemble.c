@@ -24,7 +24,7 @@ int main() {
   double* sources = (double*) malloc(3 * NSOURCES * sizeof(double));
   double* targets = (double*) malloc(3 * NSOURCES * sizeof(double));
   double* charges = (double*) malloc(3 * NSOURCES * sizeof(double));
-  double* result  = (double*) malloc(NTARGETS * sizeof(double));
+  double* result  = (double*) malloc(NSOURCES * NTARGETS * sizeof(double));
 
   for (int i = 0; i< 3 * NSOURCES; ++i) {
     sources[i] = drand();
@@ -42,9 +42,9 @@ int main() {
     result[i] = 0;
   }
 
-  green_kernel_evaluate(evaluator, GreenKernelEvalType_Value, NSOURCES, NTARGETS, sources, targets, charges, result, 3, multithreaded);
+  green_kernel_assemble(evaluator, GreenKernelEvalType_Value, NSOURCES, NTARGETS, sources, targets, result, multithreaded);
 
-  printf("The potential at the first target is: %e \n", result[0]);
+  printf("The potential from the first source at the first target is: %e \n", result[0]);
 
   free(sources);
   free(targets);
@@ -52,3 +52,4 @@ int main() {
   free(result);
   
 }
+

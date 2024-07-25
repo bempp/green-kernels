@@ -5,6 +5,8 @@ use rlst::prelude::*;
 use rlst::RlstScalar;
 use std::{ffi::c_void, mem::ManuallyDrop};
 
+use crate::helmholtz_3d::Helmholtz3dKernel;
+use crate::modified_helmholtz_3d::ModifiedHelmholtz3dKernel;
 use crate::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -103,6 +105,62 @@ pub extern "C" fn green_kernel_laplace_3d_alloc(
                 kernel_p: Box::into_raw(Box::new(
                     Box::new(Laplace3dKernel::<f64>::new()) as Box<dyn Kernel<T = f64>>
                 )) as *mut c_void,
+            });
+            Box::into_raw(evaluator)
+        }
+        _ => panic!("Unknown type!"),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn green_kernel_modified_helmholtz_3d_alloc(
+    ctype: GreenKernelCType,
+    omega: f64,
+) -> *mut GreenKernelEvaluator {
+    match ctype {
+        GreenKernelCType::F32 => {
+            let evaluator = Box::new(GreenKernelEvaluator {
+                ctype,
+                kernel_p: Box::into_raw(Box::new(Box::new(ModifiedHelmholtz3dKernel::<f32>::new(
+                    omega as f32,
+                )) as Box<dyn Kernel<T = f32>>)) as *mut c_void,
+            });
+            Box::into_raw(evaluator)
+        }
+        GreenKernelCType::F64 => {
+            let evaluator = Box::new(GreenKernelEvaluator {
+                ctype,
+                kernel_p: Box::into_raw(Box::new(Box::new(ModifiedHelmholtz3dKernel::<f64>::new(
+                    omega as f64,
+                )) as Box<dyn Kernel<T = f64>>)) as *mut c_void,
+            });
+            Box::into_raw(evaluator)
+        }
+        _ => panic!("Unknown type!"),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn green_kernel_helmholtz_3d_alloc(
+    ctype: GreenKernelCType,
+    wavenumber: f64,
+) -> *mut GreenKernelEvaluator {
+    match ctype {
+        GreenKernelCType::C32 => {
+            let evaluator = Box::new(GreenKernelEvaluator {
+                ctype,
+                kernel_p: Box::into_raw(Box::new(Box::new(Helmholtz3dKernel::<c32>::new(
+                    num::cast(wavenumber).unwrap(),
+                )) as Box<dyn Kernel<T = c32>>)) as *mut c_void,
+            });
+            Box::into_raw(evaluator)
+        }
+        GreenKernelCType::C64 => {
+            let evaluator = Box::new(GreenKernelEvaluator {
+                ctype,
+                kernel_p: Box::into_raw(Box::new(Box::new(Helmholtz3dKernel::<c64>::new(
+                    num::cast(wavenumber).unwrap(),
+                )) as Box<dyn Kernel<T = c64>>)) as *mut c_void,
             });
             Box::into_raw(evaluator)
         }

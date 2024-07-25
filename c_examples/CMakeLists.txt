@@ -21,9 +21,14 @@ FetchContent_MakeAvailable(Corrosion)
 
 corrosion_import_crate(MANIFEST_PATH ../Cargo.toml CRATE_TYPES cdylib)
 
-add_executable(kernel_evaluator_demo main.c)
-target_include_directories(kernel_evaluator_demo PUBLIC ../include)
-target_link_libraries(kernel_evaluator_demo PUBLIC green_kernels)
+add_executable(evaluate evaluate.c)
+add_executable(assemble assemble.c)
+
+target_include_directories(evaluate PUBLIC ../include)
+target_include_directories(assemble PUBLIC ../include)
+
+target_link_libraries(evaluate PUBLIC green_kernels)
+target_link_libraries(assemble PUBLIC green_kernels)
 
 
 

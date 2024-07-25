@@ -23,6 +23,7 @@ _*.msh
 
 compile_commands.json
 
-cmake_example/build
+c_examples/build
 
 .cache
+
