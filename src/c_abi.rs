@@ -64,7 +64,7 @@ fn green_kernel_inner<T: RlstScalar>(
 
 fn green_kernel_assert_type<T: RlstScalar>(kernel_p: *mut GreenKernelEvaluator) {
     assert!(!kernel_p.is_null());
-    let ctype = green_kernel_get_ctype(kernel_p);
+    let ctype = unsafe { green_kernel_get_ctype(kernel_p) };
     match ctype {
         GreenKernelCType::F32 => coe::assert_same::<f32, T>(),
         GreenKernelCType::F64 => coe::assert_same::<f64, T>(),
@@ -73,18 +73,29 @@ fn green_kernel_assert_type<T: RlstScalar>(kernel_p: *mut GreenKernelEvaluator) 
     }
 }
 
+/// Return the type of the kernel.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_get_ctype(kernel_p: *mut GreenKernelEvaluator) -> GreenKernelCType {
+pub unsafe extern "C" fn green_kernel_get_ctype(
+    kernel_p: *mut GreenKernelEvaluator,
+) -> GreenKernelCType {
     assert!(!kernel_p.is_null());
-    unsafe { (*kernel_p).get_ctype() }
+    (*kernel_p).get_ctype()
 }
 
+/// Free the kernel.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_free(kernel_p: *mut GreenKernelEvaluator) {
+pub unsafe extern "C" fn green_kernel_free(kernel_p: *mut GreenKernelEvaluator) {
     assert!(!kernel_p.is_null());
-    unsafe { drop(Box::from_raw(kernel_p)) }
+    drop(Box::from_raw(kernel_p))
 }
 
+/// Create a new Laplace kernel.
 #[no_mangle]
 pub extern "C" fn green_kernel_laplace_3d_alloc(
     ctype: GreenKernelCType,
@@ -112,6 +123,7 @@ pub extern "C" fn green_kernel_laplace_3d_alloc(
     }
 }
 
+/// Create a new Modified Helmholtz kernel.
 #[no_mangle]
 pub extern "C" fn green_kernel_modified_helmholtz_3d_alloc(
     ctype: GreenKernelCType,
@@ -131,7 +143,7 @@ pub extern "C" fn green_kernel_modified_helmholtz_3d_alloc(
             let evaluator = Box::new(GreenKernelEvaluator {
                 ctype,
                 kernel_p: Box::into_raw(Box::new(Box::new(ModifiedHelmholtz3dKernel::<f64>::new(
-                    omega as f64,
+                    omega,
                 )) as Box<dyn Kernel<T = f64>>)) as *mut c_void,
             });
             Box::into_raw(evaluator)
@@ -140,6 +152,7 @@ pub extern "C" fn green_kernel_modified_helmholtz_3d_alloc(
     }
 }
 
+/// Create a new Helmholtz kernel.
 #[no_mangle]
 pub extern "C" fn green_kernel_helmholtz_3d_alloc(
     ctype: GreenKernelCType,
@@ -168,8 +181,12 @@ pub extern "C" fn green_kernel_helmholtz_3d_alloc(
     }
 }
 
+/// Evaluate a kernel.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_evaluate(
+pub unsafe extern "C" fn green_kernel_evaluate(
     kernel_p: *mut GreenKernelEvaluator,
     eval_type: GreenKernelEvalType,
     nsources: usize,
@@ -193,7 +210,7 @@ pub extern "C" fn green_kernel_evaluate(
     ) {
         let kernel = green_kernel_inner::<T>(kernel_p);
         let range_count = kernel.range_component_count(eval_type);
-        let dim = green_kernel_space_dimension(kernel_p) as usize;
+        let dim = unsafe { green_kernel_space_dimension(kernel_p) as usize };
         let sources: &[T::Real] =
             unsafe { std::slice::from_raw_parts(sources as *const T::Real, nsources * dim) };
         let targets: &[T::Real] =
@@ -210,7 +227,7 @@ pub extern "C" fn green_kernel_evaluate(
 
     assert!(!kernel_p.is_null());
 
-    match green_kernel_get_ctype(kernel_p) {
+    match unsafe { green_kernel_get_ctype(kernel_p) } {
         GreenKernelCType::F32 => {
             impl_evaluate::<f32>(
                 kernel_p,
@@ -266,8 +283,12 @@ pub extern "C" fn green_kernel_evaluate(
     }
 }
 
+/// Assemble a kernel.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_assemble(
+pub unsafe extern "C" fn green_kernel_assemble(
     kernel_p: *mut GreenKernelEvaluator,
     eval_type: GreenKernelEvalType,
     nsources: usize,
@@ -289,7 +310,7 @@ pub extern "C" fn green_kernel_assemble(
     ) {
         let kernel = green_kernel_inner::<T>(kernel_p);
         let range_count = kernel.range_component_count(eval_type);
-        let dim = green_kernel_space_dimension(kernel_p) as usize;
+        let dim = unsafe { green_kernel_space_dimension(kernel_p) as usize };
         let sources: &[T::Real] =
             unsafe { std::slice::from_raw_parts(sources as *const T::Real, nsources * dim) };
         let targets: &[T::Real] =
@@ -358,8 +379,63 @@ pub extern "C" fn green_kernel_assemble(
     }
 }
 
+/// Pairwise assembly of sources and targets.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_range_component_count(
+pub unsafe extern "C" fn green_kernel_pairwise_assemble(
+    kernel_p: *mut GreenKernelEvaluator,
+    eval_type: GreenKernelEvalType,
+    npoints: usize,
+    sources: *const c_void,
+    targets: *const c_void,
+    result: *mut c_void,
+) {
+    fn impl_assemble<T: RlstScalar>(
+        kernel_p: *mut GreenKernelEvaluator,
+        eval_type: GreenKernelEvalType,
+        npoints: usize,
+        sources: *const c_void,
+        targets: *const c_void,
+        result: *const c_void,
+    ) {
+        let kernel = green_kernel_inner::<T>(kernel_p);
+        let range_count = kernel.range_component_count(eval_type);
+        let dim = unsafe { green_kernel_space_dimension(kernel_p) as usize };
+        let sources: &[T::Real] =
+            unsafe { std::slice::from_raw_parts(sources as *const T::Real, npoints * dim) };
+        let targets: &[T::Real] =
+            unsafe { std::slice::from_raw_parts(targets as *const T::Real, npoints * dim) };
+        let result: &mut [T] =
+            unsafe { std::slice::from_raw_parts_mut(result as *mut T, npoints * range_count) };
+        kernel.assemble_pairwise_st(eval_type, sources, targets, result);
+    }
+
+    assert!(!kernel_p.is_null());
+
+    match green_kernel_get_ctype(kernel_p) {
+        GreenKernelCType::F32 => {
+            impl_assemble::<f32>(kernel_p, eval_type, npoints, sources, targets, result);
+        }
+        GreenKernelCType::F64 => {
+            impl_assemble::<f64>(kernel_p, eval_type, npoints, sources, targets, result);
+        }
+        GreenKernelCType::C32 => {
+            impl_assemble::<c32>(kernel_p, eval_type, npoints, sources, targets, result);
+        }
+        GreenKernelCType::C64 => {
+            impl_assemble::<c64>(kernel_p, eval_type, npoints, sources, targets, result);
+        }
+    }
+}
+
+/// Return the range component count.
+///
+/// # Safety
+/// Pointer must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn green_kernel_range_component_count(
     kernel_p: *mut GreenKernelEvaluator,
     eval_type: GreenKernelEvalType,
 ) -> u32 {
@@ -380,8 +456,14 @@ pub extern "C" fn green_kernel_range_component_count(
     }
 }
 
+/// Return the domain component count.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_domain_component_count(kernel_p: *mut GreenKernelEvaluator) -> u32 {
+pub unsafe extern "C" fn green_kernel_domain_component_count(
+    kernel_p: *mut GreenKernelEvaluator,
+) -> u32 {
     assert!(!kernel_p.is_null());
     match green_kernel_get_ctype(kernel_p) {
         GreenKernelCType::F32 => {
@@ -399,8 +481,12 @@ pub extern "C" fn green_kernel_domain_component_count(kernel_p: *mut GreenKernel
     }
 }
 
+/// Return the space dimension.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn green_kernel_space_dimension(kernel_p: *mut GreenKernelEvaluator) -> u32 {
+pub unsafe extern "C" fn green_kernel_space_dimension(kernel_p: *mut GreenKernelEvaluator) -> u32 {
     assert!(!kernel_p.is_null());
     match green_kernel_get_ctype(kernel_p) {
         GreenKernelCType::F32 => green_kernel_inner::<f32>(kernel_p).space_dimension() as u32,
@@ -410,8 +496,12 @@ pub extern "C" fn green_kernel_space_dimension(kernel_p: *mut GreenKernelEvaluat
     }
 }
 
+/// Evaluate the Greens function for a single source/target pair.
+///
+/// # Safety
+/// Pointer must be valid.
 #[no_mangle]
-pub extern "C" fn greens_fct(
+pub unsafe extern "C" fn greens_fct(
     kernel_p: *mut GreenKernelEvaluator,
     eval_type: GreenKernelEvalType,
     source: *const c_void,
@@ -426,8 +516,9 @@ pub extern "C" fn greens_fct(
         result: *mut c_void,
     ) {
         assert!(!kernel_p.is_null());
-        let dim = green_kernel_space_dimension(kernel_p) as usize;
-        let range_components = green_kernel_range_component_count(kernel_p, eval_type) as usize;
+        let dim = unsafe { green_kernel_space_dimension(kernel_p) as usize };
+        let range_components =
+            unsafe { green_kernel_range_component_count(kernel_p, eval_type) as usize };
         let source = unsafe { std::slice::from_raw_parts(source as *const T::Real, dim) };
         let target = unsafe { std::slice::from_raw_parts(target as *const T::Real, dim) };
         let result = unsafe { std::slice::from_raw_parts_mut(result as *mut T, range_components) };
@@ -457,8 +548,10 @@ mod test {
     #[test]
     fn test_create_laplace_evaluator() {
         let evaluator = green_kernel_laplace_3d_alloc(GreenKernelCType::F32);
-        assert_eq!(GreenKernelCType::F32, green_kernel_get_ctype(evaluator));
+        assert_eq!(GreenKernelCType::F32, unsafe {
+            green_kernel_get_ctype(evaluator)
+        });
 
-        green_kernel_free(evaluator);
+        unsafe { green_kernel_free(evaluator) };
     }
 }
