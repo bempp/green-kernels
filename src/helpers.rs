@@ -1,12 +1,12 @@
 //! Helpers
 
 use crate::traits::Kernel;
-use crate::types::EvalType;
+use crate::types::GreenKernelEvalType;
 use rlst::RlstScalar;
 
 pub(crate) fn check_dimensions_evaluate<K: Kernel, T: RlstScalar>(
     kernel: &K,
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     sources: &[T::Real],
     targets: &[T::Real],
     charges: &[T],
@@ -48,7 +48,7 @@ pub(crate) fn check_dimensions_evaluate<K: Kernel, T: RlstScalar>(
 
 pub(crate) fn check_dimensions_assemble<K: Kernel, T: RlstScalar>(
     kernel: &K,
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     sources: &[T::Real],
     targets: &[T::Real],
     result: &[T],
@@ -81,7 +81,7 @@ pub(crate) fn check_dimensions_assemble<K: Kernel, T: RlstScalar>(
 
 pub(crate) fn check_dimensions_assemble_diagonal<K: Kernel, T: RlstScalar>(
     kernel: &K,
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     sources: &[T::Real],
     targets: &[T::Real],
     result: &[T],

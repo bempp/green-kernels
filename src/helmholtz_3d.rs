@@ -3,7 +3,7 @@ use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use crate::traits::Kernel;
-use crate::types::EvalType;
+use crate::types::GreenKernelEvalType;
 use num::traits::FloatConst;
 use num::One;
 use num::Zero;
@@ -51,7 +51,7 @@ where
 
     fn evaluate_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -83,7 +83,7 @@ where
 
     fn evaluate_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -115,7 +115,7 @@ where
 
     fn greens_fct(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         source: &[<Self::T as RlstScalar>::Real],
         target: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -154,10 +154,10 @@ where
             let (s, c) = kr.sin_cos();
             let inv_diff_pi = inv_diff_norm * m_inv_4pi;
             match eval_type {
-                EvalType::Value => {
+                GreenKernelEvalType::Value => {
                     result[0] = c32::new(c * inv_diff_pi, s * inv_diff_pi);
                 }
-                EvalType::ValueDeriv => {
+                GreenKernelEvalType::ValueDeriv => {
                     let (g_re, g_im) = (c * inv_diff_pi, s * inv_diff_pi);
                     let (g_deriv_re, g_deriv_im) = (
                         g_re * inv_diff_norm * inv_diff_norm,
@@ -204,10 +204,10 @@ where
             let (s, c) = kr.sin_cos();
             let inv_diff_pi = inv_diff_norm * m_inv_4pi;
             match eval_type {
-                EvalType::Value => {
+                GreenKernelEvalType::Value => {
                     result[0] = c64::new(c * inv_diff_pi, s * inv_diff_pi);
                 }
-                EvalType::ValueDeriv => {
+                GreenKernelEvalType::ValueDeriv => {
                     let (g_re, g_im) = (c * inv_diff_pi, s * inv_diff_pi);
                     let (g_deriv_re, g_deriv_im) = (
                         g_re * inv_diff_norm * inv_diff_norm,
@@ -232,7 +232,7 @@ where
 
     fn assemble_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -263,7 +263,7 @@ where
 
     fn assemble_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -294,7 +294,7 @@ where
 
     fn assemble_pairwise_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -305,7 +305,7 @@ where
         let wavenumber = self.wavenumber;
 
         match eval_type {
-            EvalType::Value => {
+            GreenKernelEvalType::Value => {
                 struct Impl<'a, T: RlstScalar<Complex = T>>
                 where
                     T::Real: RlstSimd,
@@ -437,7 +437,7 @@ where
                     panic!()
                 }
             }
-            EvalType::ValueDeriv => {
+            GreenKernelEvalType::ValueDeriv => {
                 struct Impl<'a, T: RlstScalar<Complex = T>>
                 where
                     T::Real: RlstSimd,
@@ -646,14 +646,14 @@ where
         //     });
     }
 
-    fn range_component_count(&self, eval_type: EvalType) -> usize {
+    fn range_component_count(&self, eval_type: GreenKernelEvalType) -> usize {
         helmholtz_component_count(eval_type)
     }
 }
 
 /// Evaluate Helmholtz kernel for one target
 pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     target: &[T::Real],
     sources: &[T::Real],
     charges: &[T],
@@ -662,7 +662,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
 ) {
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
     match eval_type {
-        EvalType::Value => {
+        GreenKernelEvalType::Value => {
             struct Impl<'a, T: RlstScalar<Complex = T>>
             where
                 T::Real: RlstSimd,
@@ -811,7 +811,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                 panic!()
             }
         }
-        EvalType::ValueDeriv => {
+        GreenKernelEvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Complex = T>>
             where
                 T::Real: RlstSimd,
@@ -1032,7 +1032,7 @@ pub fn evaluate_helmholtz_one_target<T: RlstScalar<Complex = T>>(
 
 /// Assemble Helmholtz kernel for one target
 pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
     wavenumber: T::Real,
@@ -1044,7 +1044,7 @@ pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
     match eval_type {
-        EvalType::Value => {
+        GreenKernelEvalType::Value => {
             struct Impl<'a, T: RlstScalar<Complex = T>>
             where
                 T::Real: RlstSimd,
@@ -1189,7 +1189,7 @@ pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
                 panic!()
             }
         }
-        EvalType::ValueDeriv => {
+        GreenKernelEvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Complex = T>>
             where
                 T::Real: RlstSimd,
@@ -1389,10 +1389,10 @@ pub fn assemble_helmholtz_one_target<T: RlstScalar<Complex = T>>(
     }
 }
 
-fn helmholtz_component_count(eval_type: EvalType) -> usize {
+fn helmholtz_component_count(eval_type: GreenKernelEvalType) -> usize {
     match eval_type {
-        EvalType::Value => 1,
-        EvalType::ValueDeriv => 4,
+        GreenKernelEvalType::Value => 1,
+        GreenKernelEvalType::ValueDeriv => 4,
     }
 }
 
@@ -1425,7 +1425,7 @@ mod test {
         charges.fill_from_equally_distributed(&mut rng);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1449,7 +1449,7 @@ mod test {
                     c32::from_real(0.0),
                 ];
                 Helmholtz3dKernel::new(wavenumber).greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     res.as_mut_slice(),
@@ -1457,7 +1457,7 @@ mod test {
                 *val += charge * res[0];
 
                 Helmholtz3dKernel::new(wavenumber).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     res_deriv.as_mut_slice(),
@@ -1481,7 +1481,7 @@ mod test {
         let mut actual = rlst::rlst_dynamic_array2!(c32, [4, ntargets]);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1535,7 +1535,7 @@ mod test {
         charges.fill_from_equally_distributed(&mut rng);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1559,7 +1559,7 @@ mod test {
                     c64::from_real(0.0),
                 ];
                 Helmholtz3dKernel::new(wavenumber).greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     res.as_mut_slice(),
@@ -1567,7 +1567,7 @@ mod test {
                 *val += charge * res[0];
 
                 Helmholtz3dKernel::new(wavenumber).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     res_deriv.as_mut_slice(),
@@ -1591,7 +1591,7 @@ mod test {
         let mut actual = rlst::rlst_dynamic_array2!(c64, [4, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1643,7 +1643,7 @@ mod test {
         targets.fill_from_equally_distributed(&mut rng);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             result.data_mut(),
@@ -1654,7 +1654,7 @@ mod test {
                 let mut expected = [c64::default()];
 
                 Helmholtz3dKernel::<c64>::new(wavenumber).greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     expected.as_mut_slice(),
@@ -1688,7 +1688,7 @@ mod test {
         targets.fill_from_equally_distributed(&mut rng);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             result.data_mut(),
@@ -1699,7 +1699,7 @@ mod test {
                 let mut expected = [c32::default()];
 
                 Helmholtz3dKernel::<c32>::new(wavenumber).greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     expected.as_mut_slice(),
@@ -1733,7 +1733,7 @@ mod test {
         targets.fill_from_equally_distributed(&mut rng);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             result.data_mut(),
@@ -1749,7 +1749,7 @@ mod test {
                 ];
 
                 Helmholtz3dKernel::<c32>::new(wavenumber).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     expected.as_mut_slice(),
@@ -1785,7 +1785,7 @@ mod test {
         targets.fill_from_equally_distributed(&mut rng);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             result.data_mut(),
@@ -1801,7 +1801,7 @@ mod test {
                 ];
 
                 Helmholtz3dKernel::<c64>::new(wavenumber).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     expected.as_mut_slice(),
@@ -1835,13 +1835,13 @@ mod test {
         let mut green_value_diag_deriv = rlst_dynamic_array2!(c32, [4, ntargets]);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).assemble_pairwise_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value_diag.data_mut(),
         );
         Helmholtz3dKernel::<c32>::new(wavenumber).assemble_pairwise_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_diag_deriv.data_mut(),
@@ -1850,7 +1850,7 @@ mod test {
         let mut green_value = rlst_dynamic_array2!(c32, [nsources, ntargets]);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value.data_mut(),
@@ -1862,7 +1862,7 @@ mod test {
         let mut green_value_deriv = rlst_dynamic_array2!(c32, [4 * nsources, ntargets]);
 
         Helmholtz3dKernel::<c32>::new(wavenumber).assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_deriv.data_mut(),
@@ -1917,13 +1917,13 @@ mod test {
         let mut green_value_diag_deriv = rlst_dynamic_array2!(c64, [4, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_pairwise_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value_diag.data_mut(),
         );
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_pairwise_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_diag_deriv.data_mut(),
@@ -1932,7 +1932,7 @@ mod test {
         let mut green_value = rlst_dynamic_array2!(c64, [nsources, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value.data_mut(),
@@ -1944,7 +1944,7 @@ mod test {
         let mut green_value_deriv = rlst_dynamic_array2!(c64, [4 * nsources, ntargets]);
 
         Helmholtz3dKernel::<c64>::new(wavenumber).assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_deriv.data_mut(),

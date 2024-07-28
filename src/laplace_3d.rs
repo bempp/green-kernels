@@ -3,7 +3,7 @@ use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use crate::traits::Kernel;
-use crate::types::EvalType;
+use crate::types::GreenKernelEvalType;
 use num::traits::FloatConst;
 use rayon::prelude::*;
 use rlst::{RlstScalar, RlstSimd, SimdFor};
@@ -40,7 +40,7 @@ where
 
     fn evaluate_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -65,7 +65,7 @@ where
 
     fn evaluate_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -90,7 +90,7 @@ where
 
     fn assemble_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -115,7 +115,7 @@ where
 
     fn assemble_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -140,7 +140,7 @@ where
 
     fn assemble_pairwise_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -149,7 +149,7 @@ where
         let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
         match eval_type {
-            EvalType::Value => {
+            GreenKernelEvalType::Value => {
                 struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                     m_inv_4pi: T,
 
@@ -250,7 +250,7 @@ where
                     panic!()
                 }
             }
-            EvalType::ValueDeriv => {
+            GreenKernelEvalType::ValueDeriv => {
                 struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                     m_inv_4pi: T,
 
@@ -363,14 +363,14 @@ where
         }
     }
 
-    fn range_component_count(&self, eval_type: EvalType) -> usize {
+    fn range_component_count(&self, eval_type: GreenKernelEvalType) -> usize {
         laplace_component_count(eval_type)
     }
 
     #[inline(always)]
     fn greens_fct(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         source: &[<Self::T as RlstScalar>::Real],
         target: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -403,10 +403,10 @@ where
             };
 
             match eval_type {
-                EvalType::Value => {
+                GreenKernelEvalType::Value => {
                     result[0] = coe::coerce_static(inv_diff_norm * m_inv_4pi);
                 }
-                EvalType::ValueDeriv => {
+                GreenKernelEvalType::ValueDeriv => {
                     let inv_diff_norm_cube = inv_diff_norm * inv_diff_norm * inv_diff_norm;
                     result[0] = coe::coerce_static(inv_diff_norm * m_inv_4pi);
                     result[1] = coe::coerce_static(inv_diff_norm_cube * m_inv_4pi * diff0);
@@ -439,10 +439,10 @@ where
             };
 
             match eval_type {
-                EvalType::Value => {
+                GreenKernelEvalType::Value => {
                     result[0] = coe::coerce_static(inv_diff_norm * m_inv_4pi);
                 }
-                EvalType::ValueDeriv => {
+                GreenKernelEvalType::ValueDeriv => {
                     let inv_diff_norm_cube = inv_diff_norm * inv_diff_norm * inv_diff_norm;
                     result[0] = coe::coerce_static(inv_diff_norm * m_inv_4pi);
                     result[1] = coe::coerce_static(inv_diff_norm_cube * m_inv_4pi * diff0);
@@ -458,7 +458,7 @@ where
 
 /// Evaluate laplce kernel with one target
 pub fn evaluate_laplace_one_target<T: RlstScalar>(
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
     charges: &[T],
@@ -467,7 +467,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
     match eval_type {
-        EvalType::Value => {
+        GreenKernelEvalType::Value => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 t0: T,
                 t1: T,
@@ -575,7 +575,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
                 panic!()
             }
         }
-        EvalType::ValueDeriv => {
+        GreenKernelEvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 t0: T,
                 t1: T,
@@ -712,7 +712,7 @@ pub fn evaluate_laplace_one_target<T: RlstScalar>(
 
 /// Assemble Laplace kernel with one target
 pub fn assemble_laplace_one_target<T: RlstScalar>(
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
     result: &mut [T],
@@ -722,7 +722,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
     match eval_type {
-        EvalType::Value => {
+        GreenKernelEvalType::Value => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 m_inv_4pi: T,
                 t0: T,
@@ -831,7 +831,7 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
                 panic!()
             }
         }
-        EvalType::ValueDeriv => {
+        GreenKernelEvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 m_inv_4pi: T,
                 t0: T,
@@ -951,10 +951,10 @@ pub fn assemble_laplace_one_target<T: RlstScalar>(
     }
 }
 
-fn laplace_component_count(eval_type: EvalType) -> usize {
+fn laplace_component_count(eval_type: GreenKernelEvalType) -> usize {
     match eval_type {
-        EvalType::Value => 1,
-        EvalType::ValueDeriv => 4,
+        GreenKernelEvalType::Value => 1,
+        GreenKernelEvalType::ValueDeriv => 4,
     }
 }
 
@@ -984,7 +984,7 @@ mod test {
         charges.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f32>::default().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1023,7 +1023,7 @@ mod test {
         charges.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f64>::default().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1062,14 +1062,14 @@ mod test {
         let mut expect: [f32; 1] = [0.0];
 
         Laplace3dKernel::<f32>::default().greens_fct(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             source.data(),
             target.data(),
             result.as_mut_slice(),
         );
 
         Laplace3dKernel::<f32>::default().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             source.data(),
             target.data(),
             charge.as_slice(),
@@ -1082,14 +1082,14 @@ mod test {
         let mut expect: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
 
         Laplace3dKernel::<f32>::default().greens_fct(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             source.data(),
             target.data(),
             result.as_mut_slice(),
         );
 
         Laplace3dKernel::<f32>::default().evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             source.data(),
             target.data(),
             charge.as_slice(),
@@ -1116,14 +1116,14 @@ mod test {
         let mut expect: [f64; 1] = [0.0];
 
         Laplace3dKernel::<f64>::default().greens_fct(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             source.data(),
             target.data(),
             result.as_mut_slice(),
         );
 
         Laplace3dKernel::<f64>::default().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             source.data(),
             target.data(),
             charge.as_slice(),
@@ -1136,14 +1136,14 @@ mod test {
         let mut expect: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
 
         Laplace3dKernel::<f64>::default().greens_fct(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             source.data(),
             target.data(),
             result.as_mut_slice(),
         );
 
         Laplace3dKernel::<f64>::default().evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             source.data(),
             target.data(),
             charge.as_slice(),
@@ -1174,7 +1174,7 @@ mod test {
         charges.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f32>::new().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1198,7 +1198,7 @@ mod test {
                     f32::from_real(0.0),
                 ];
                 Laplace3dKernel::new().greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     res.as_mut_slice(),
@@ -1206,7 +1206,7 @@ mod test {
                 *val += charge * res[0];
 
                 Laplace3dKernel::new().greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     res_deriv.as_mut_slice(),
@@ -1230,7 +1230,7 @@ mod test {
         let mut actual = rlst::rlst_dynamic_array2!(f32, [4, ntargets]);
 
         Laplace3dKernel::<f32>::new().evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1282,7 +1282,7 @@ mod test {
         charges.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f64>::new().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1306,7 +1306,7 @@ mod test {
                     f64::from_real(0.0),
                 ];
                 Laplace3dKernel::new().greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     res.as_mut_slice(),
@@ -1314,7 +1314,7 @@ mod test {
                 *val += charge * res[0];
 
                 Laplace3dKernel::new().greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     res_deriv.as_mut_slice(),
@@ -1338,7 +1338,7 @@ mod test {
         let mut actual = rlst::rlst_dynamic_array2!(f64, [4, ntargets]);
 
         Laplace3dKernel::<f64>::new().evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1384,7 +1384,7 @@ mod test {
         sources.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f64>::default().assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value.data_mut(),
@@ -1399,7 +1399,7 @@ mod test {
             charges[[charge_index]] = 1.0;
 
             Laplace3dKernel::<f64>::default().evaluate_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 sources.data(),
                 targets.data(),
                 charges.data(),
@@ -1418,7 +1418,7 @@ mod test {
         let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_deriv.data_mut(),
@@ -1433,7 +1433,7 @@ mod test {
             charges[[charge_index]] = 1.0;
 
             Laplace3dKernel::<f64>::default().evaluate_st(
-                EvalType::ValueDeriv,
+                GreenKernelEvalType::ValueDeriv,
                 sources.data(),
                 targets.data(),
                 charges.data(),
@@ -1466,7 +1466,7 @@ mod test {
         sources.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f32>::default().assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value.data_mut(),
@@ -1481,7 +1481,7 @@ mod test {
             charges[[charge_index]] = 1.0;
 
             Laplace3dKernel::<f32>::default().evaluate_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 sources.data(),
                 targets.data(),
                 charges.data(),
@@ -1500,7 +1500,7 @@ mod test {
         let mut green_value_deriv = rlst_dynamic_array2!(f32, [4 * nsources, ntargets]);
 
         Laplace3dKernel::<f32>::default().assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_deriv.data_mut(),
@@ -1515,7 +1515,7 @@ mod test {
             charges[[charge_index]] = 1.0;
 
             Laplace3dKernel::<f32>::default().evaluate_st(
-                EvalType::ValueDeriv,
+                GreenKernelEvalType::ValueDeriv,
                 sources.data(),
                 targets.data(),
                 charges.data(),
@@ -1549,13 +1549,13 @@ mod test {
         let mut green_value_diag_deriv = rlst_dynamic_array2!(f64, [4, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_pairwise_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value_diag.data_mut(),
         );
         Laplace3dKernel::<f64>::default().assemble_pairwise_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_diag_deriv.data_mut(),
@@ -1564,7 +1564,7 @@ mod test {
         let mut green_value = rlst_dynamic_array2!(f64, [nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value.data_mut(),
@@ -1576,7 +1576,7 @@ mod test {
         let mut green_value_deriv = rlst_dynamic_array2!(f64, [4 * nsources, ntargets]);
 
         Laplace3dKernel::<f64>::default().assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_deriv.data_mut(),
@@ -1630,13 +1630,13 @@ mod test {
         let mut green_value_diag_deriv = rlst_dynamic_array2!(f32, [4, ntargets]);
 
         Laplace3dKernel::<f32>::default().assemble_pairwise_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value_diag.data_mut(),
         );
         Laplace3dKernel::<f32>::default().assemble_pairwise_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_diag_deriv.data_mut(),
@@ -1645,7 +1645,7 @@ mod test {
         let mut green_value = rlst_dynamic_array2!(f32, [nsources, ntargets]);
 
         Laplace3dKernel::<f32>::default().assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             green_value.data_mut(),
@@ -1657,7 +1657,7 @@ mod test {
         let mut green_value_deriv = rlst_dynamic_array2!(f32, [4 * nsources, ntargets]);
 
         Laplace3dKernel::<f32>::default().assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             green_value_deriv.data_mut(),

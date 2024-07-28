@@ -1,5 +1,5 @@
 //! Trait for Green's function kernels
-use crate::types::EvalType;
+use crate::types::GreenKernelEvalType;
 use rlst::RlstScalar;
 
 /// Interface to evaluating Green's functions for given sources and targets.
@@ -10,7 +10,7 @@ pub trait Kernel: Sync {
     /// Evaluate the Green's fct. for a single source and single target.
     fn greens_fct(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         source: &[<Self::T as RlstScalar>::Real],
         target: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -33,7 +33,7 @@ pub trait Kernel: Sync {
     ///
     fn evaluate_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -46,7 +46,7 @@ pub trait Kernel: Sync {
     /// in which the multi-threaded execution can be scheduled.
     fn evaluate_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -71,7 +71,7 @@ pub trait Kernel: Sync {
     ///
     fn assemble_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -80,7 +80,7 @@ pub trait Kernel: Sync {
     /// Multi-threaded version of kernel matrix assembly.
     fn assemble_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -89,7 +89,7 @@ pub trait Kernel: Sync {
     /// Single threaded assembly of the diagonal of a kernel matrix
     fn assemble_pairwise_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -107,5 +107,5 @@ pub trait Kernel: Sync {
     ///
     /// For a RlstScalar kernel this is `1` if [EvalType::Value] is
     /// given, and `4` if [EvalType::ValueDeriv] is given.
-    fn range_component_count(&self, eval_type: EvalType) -> usize;
+    fn range_component_count(&self, eval_type: GreenKernelEvalType) -> usize;
 }

@@ -7,7 +7,7 @@ use rlst::prelude::*;
 
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::traits::Kernel;
-use green_kernels::types::EvalType;
+use green_kernels::types::GreenKernelEvalType;
 
 use rand::SeedableRng;
 
@@ -31,7 +31,7 @@ pub fn laplace_f32_test_standard(c: &mut Criterion) {
     c.bench_function("Laplace evaluate f32", |b| {
         b.iter(|| {
             Laplace3dKernel::<f32>::new().evaluate_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 sources.data(),
                 targets.data(),
                 charges.data(),

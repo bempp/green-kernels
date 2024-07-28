@@ -3,7 +3,7 @@ use crate::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
 use crate::traits::Kernel;
-use crate::types::EvalType;
+use crate::types::GreenKernelEvalType;
 use num::traits::FloatConst;
 use rayon::prelude::*;
 use rlst::{RlstScalar, RlstSimd, SimdFor};
@@ -34,7 +34,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 
     fn evaluate_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -61,7 +61,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 
     fn evaluate_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         charges: &[Self::T],
@@ -88,7 +88,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 
     fn assemble_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -115,7 +115,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 
     fn assemble_mt(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -142,7 +142,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 
     fn assemble_pairwise_st(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &[<Self::T as RlstScalar>::Real],
         targets: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -151,7 +151,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
         let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
         match eval_type {
-            EvalType::Value => {
+            GreenKernelEvalType::Value => {
                 struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                     m_inv_4pi: T,
                     omega: T,
@@ -265,7 +265,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
                     panic!()
                 }
             }
-            EvalType::ValueDeriv => {
+            GreenKernelEvalType::ValueDeriv => {
                 struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                     m_inv_4pi: T,
                     omega: T,
@@ -397,14 +397,14 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
         }
     }
 
-    fn range_component_count(&self, eval_type: EvalType) -> usize {
+    fn range_component_count(&self, eval_type: GreenKernelEvalType) -> usize {
         modified_helmholtz_component_count(eval_type)
     }
 
     #[inline(always)]
     fn greens_fct(
         &self,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         source: &[<Self::T as RlstScalar>::Real],
         target: &[<Self::T as RlstScalar>::Real],
         result: &mut [Self::T],
@@ -441,10 +441,10 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
             };
 
             match eval_type {
-                EvalType::Value => {
+                GreenKernelEvalType::Value => {
                     result[0] = coe::coerce_static(inv_diff_norm * m_inv_4pi * (-romega).exp());
                 }
-                EvalType::ValueDeriv => {
+                GreenKernelEvalType::ValueDeriv => {
                     let inv_diff_norm_omega = inv_diff_norm * (-romega).exp() * m_inv_4pi;
                     let inv_diff_norm_cube_omega =
                         inv_diff_norm * inv_diff_norm * inv_diff_norm_omega;
@@ -486,10 +486,10 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
             };
 
             match eval_type {
-                EvalType::Value => {
+                GreenKernelEvalType::Value => {
                     result[0] = coe::coerce_static(inv_diff_norm * m_inv_4pi * (-romega).exp());
                 }
-                EvalType::ValueDeriv => {
+                GreenKernelEvalType::ValueDeriv => {
                     let inv_diff_norm_omega = inv_diff_norm * (-romega).exp() * m_inv_4pi;
                     let inv_diff_norm_cube_omega =
                         inv_diff_norm * inv_diff_norm * inv_diff_norm_omega;
@@ -510,7 +510,7 @@ impl<T: RlstScalar<Real = T> + Send + Sync> Kernel for ModifiedHelmholtz3dKernel
 
 /// Evaluate laplce kernel with one target
 pub fn evaluate_modified_helmholtz_one_target<T: RlstScalar>(
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
     charges: &[T],
@@ -520,7 +520,7 @@ pub fn evaluate_modified_helmholtz_one_target<T: RlstScalar>(
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
     match eval_type {
-        EvalType::Value => {
+        GreenKernelEvalType::Value => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 omega: T,
                 t0: T,
@@ -641,7 +641,7 @@ pub fn evaluate_modified_helmholtz_one_target<T: RlstScalar>(
                 panic!()
             }
         }
-        EvalType::ValueDeriv => {
+        GreenKernelEvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 omega: T,
                 t0: T,
@@ -794,7 +794,7 @@ pub fn evaluate_modified_helmholtz_one_target<T: RlstScalar>(
 
 /// Assemble modified Helmholtz kernel with one target
 pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
-    eval_type: EvalType,
+    eval_type: GreenKernelEvalType,
     target: &[<T as RlstScalar>::Real],
     sources: &[<T as RlstScalar>::Real],
     omega: T,
@@ -805,7 +805,7 @@ pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
     let m_inv_4pi = num::cast::<f64, T::Real>(0.25 * f64::FRAC_1_PI()).unwrap();
 
     match eval_type {
-        EvalType::Value => {
+        GreenKernelEvalType::Value => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 m_inv_4pi: T,
                 omega: T,
@@ -935,7 +935,7 @@ pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
                 panic!()
             }
         }
-        EvalType::ValueDeriv => {
+        GreenKernelEvalType::ValueDeriv => {
             struct Impl<'a, T: RlstScalar<Real = T> + RlstSimd> {
                 m_inv_4pi: T,
                 omega: T,
@@ -1083,10 +1083,10 @@ pub fn assemble_modified_helmholtz_one_target<T: RlstScalar>(
     }
 }
 
-fn modified_helmholtz_component_count(eval_type: EvalType) -> usize {
+fn modified_helmholtz_component_count(eval_type: GreenKernelEvalType) -> usize {
     match eval_type {
-        EvalType::Value => 1,
-        EvalType::ValueDeriv => 4,
+        GreenKernelEvalType::Value => 1,
+        GreenKernelEvalType::ValueDeriv => 4,
     }
 }
 
@@ -1130,14 +1130,14 @@ mod test {
                         let mut expected_deriv_z = [0.0];
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                            EvalType::Value,
+                            GreenKernelEvalType::Value,
                             source.data(),
                             target.data(),
                             actual_value.as_mut_slice(),
                         );
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                            EvalType::ValueDeriv,
+                            GreenKernelEvalType::ValueDeriv,
                             source.data(),
                             target.data(),
                             actual_deriv.as_mut_slice(),
@@ -1156,21 +1156,21 @@ mod test {
                         target_z[[2]] += delta;
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                            EvalType::Value,
+                            GreenKernelEvalType::Value,
                             source.data(),
                             target_x.data(),
                             expected_deriv_x.as_mut_slice(),
                         );
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                            EvalType::Value,
+                            GreenKernelEvalType::Value,
                             source.data(),
                             target_y.data(),
                             expected_deriv_y.as_mut_slice(),
                         );
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                            EvalType::Value,
+                            GreenKernelEvalType::Value,
                             source.data(),
                             target_z.data(),
                             expected_deriv_z.as_mut_slice(),
@@ -1215,14 +1215,14 @@ mod test {
                 let mut expected_deriv = [0.0; 4];
 
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     actual_deriv.as_mut_slice(),
                 );
 
                 Laplace3dKernel::<$scalar>::new().greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     expected_deriv.as_mut_slice(),
@@ -1252,14 +1252,14 @@ mod test {
                 let mut result_value_deriv = rlst_dynamic_array2!($scalar, [4, npoints]);
 
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_pairwise_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     sources.data(),
                     targets.data(),
                     result_value.data_mut(),
                 );
 
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_pairwise_st(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     sources.data(),
                     targets.data(),
                     result_value_deriv.data_mut(),
@@ -1275,14 +1275,14 @@ mod test {
                     let mut expected_deriv = [0.0; 4];
 
                     ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                        EvalType::Value,
+                        GreenKernelEvalType::Value,
                         s.data(),
                         t.data(),
                         expected_val.as_mut_slice(),
                     );
 
                     ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                        EvalType::ValueDeriv,
+                        GreenKernelEvalType::ValueDeriv,
                         s.data(),
                         t.data(),
                         expected_deriv.as_mut_slice(),
@@ -1328,13 +1328,13 @@ mod test {
                 let mut res_val = [0.0];
                 let mut res_val_deriv = [0.0; 4];
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     res_val.as_mut_slice(),
                 );
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     res_val_deriv.as_mut_slice(),
@@ -1354,14 +1354,14 @@ mod test {
         let mut actual_value_deriv = rlst_dynamic_array2!($scalar, [4, ntargets]);
 
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             charges.data(),
             actual_value.data_mut(),
         );
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).evaluate_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             charges.data(),
@@ -1398,13 +1398,13 @@ mod test {
         let mut actual_value_deriv = rlst_dynamic_array2!($scalar, [4 * nsources, ntargets]);
 
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             targets.data(),
             actual_value.data_mut(),
         );
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_st(
-            EvalType::ValueDeriv,
+            GreenKernelEvalType::ValueDeriv,
             sources.data(),
             targets.data(),
             actual_value_deriv.data_mut(),
@@ -1417,13 +1417,13 @@ mod test {
                 let mut expected_val = [0.0];
                 let mut expected_val_deriv = [0.0; 4];
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     source.data(),
                     target.data(),
                     expected_val.as_mut_slice(),
                 );
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     source.data(),
                     target.data(),
                     expected_val_deriv.as_mut_slice(),

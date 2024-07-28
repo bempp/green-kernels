@@ -7,7 +7,7 @@ use rlst::prelude::*;
 
 use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::traits::Kernel;
-use green_kernels::types::EvalType;
+use green_kernels::types::GreenKernelEvalType;
 
 use rand::SeedableRng;
 
@@ -31,7 +31,7 @@ pub fn helmholtz_c32_test_standard(c: &mut Criterion) {
     c.bench_function("Helmholtz evaluate c32", |b| {
         b.iter(|| {
             Helmholtz3dKernel::<c32>::new(1.0).evaluate_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 sources.data(),
                 targets.data(),
                 charges.data(),

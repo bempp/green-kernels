@@ -20,3 +20,10 @@ _*.msh
 *.btr
 
 .vscode/
+
+compile_commands.json
+
+c_examples/build
+
+.cache
+
