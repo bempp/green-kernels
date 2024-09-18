@@ -2,10 +2,12 @@
 nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
+sleef = ["rlst/sleef"]
+default = ["sleef"]
 
 [package]
 name = "green-kernels"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 description = "Evaluation of Green's function kernels."
@@ -27,7 +29,7 @@ approx = { version = "0.5", features = ["num-complex"] }
 rayon = "1.9"
 num = "0.4"
 num_cpus = "1"
-rlst = { version = "0.2", features = ["sleef"] }
+rlst = { version = "0.2" }
 rand = "0.8.5"
 itertools = { version = "0.13.0", default-features = false }
 coe-rs = "0.1.2"
