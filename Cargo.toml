@@ -7,7 +7,7 @@ default = ["sleef"]
 
 [package]
 name = "green-kernels"
-version = "0.2.1"
+version = "0.2.1-dev"
 edition = "2021"
 authors = ["Timo Betcke <timo.betcke@gmail.com>", "Matthew Scroggs <rust@mscroggs.co.uk>"]
 description = "Evaluation of Green's function kernels."
