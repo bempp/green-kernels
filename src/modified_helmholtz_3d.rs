@@ -1147,9 +1147,9 @@ mod test {
                         let mut target_y = rlst_dynamic_array1!($scalar, [3]);
                         let mut target_z = rlst_dynamic_array1!($scalar, [3]);
 
-                        target_x.fill_from(target.view());
-                        target_y.fill_from(target.view());
-                        target_z.fill_from(target.view());
+                        target_y.fill_from(target.r());
+                        target_z.fill_from(target.r());
+                        target_x.fill_from(target.r());
 
                         target_x[[0]] += delta;
                         target_y[[1]] += delta;

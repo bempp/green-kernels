@@ -31,7 +31,7 @@ where
 
     for (source_index, source) in sources.col_iter().enumerate() {
         for (target_index, target) in targets.col_iter().enumerate() {
-            let diff_norm = (source.view() - target.view()).norm_2();
+            let diff_norm = (source.r() - target.r()).norm_2();
             let green = result[[source_index, target_index]];
             let green_exact = T::one()
                 / (num::cast::<f64, T>(4.0 * f64::PI()).unwrap()
@@ -66,7 +66,7 @@ where
 
     for (source_index, source) in sources.col_iter().enumerate() {
         for (target_index, target) in targets.col_iter().enumerate() {
-            let diff_norm = (source.view() - target.view()).norm_2();
+            let diff_norm = (source.r() - target.r()).norm_2();
             let green = result[[source_index, target_index]];
             let green_exact = T::exp(T::from_real(
                 num::cast::<f64, T::Real>(-1.5).unwrap() * diff_norm,
@@ -102,7 +102,7 @@ where
 
     for (source_index, source) in sources.col_iter().enumerate() {
         for (target_index, target) in targets.col_iter().enumerate() {
-            let diff_norm = (source.view() - target.view()).norm_2();
+            let diff_norm = (source.r() - target.r()).norm_2();
             let green = result[[source_index, target_index]];
             let green_exact = T::complex(
                 T::cos(T::from_real(
