@@ -980,7 +980,7 @@ mod test {
         let mut green_value = rlst_dynamic_array1!(f32, [nparticles]);
 
         sources.fill_from_equally_distributed(&mut rng);
-        targets.fill_from(sources.view());
+        targets.fill_from(sources.r());
         charges.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f32>::default().evaluate_st(
@@ -1019,7 +1019,7 @@ mod test {
         let mut green_value = rlst_dynamic_array1!(f64, [nparticles]);
 
         sources.fill_from_equally_distributed(&mut rng);
-        targets.fill_from(sources.view());
+        targets.fill_from(sources.r());
         charges.fill_from_equally_distributed(&mut rng);
 
         Laplace3dKernel::<f64>::default().evaluate_st(

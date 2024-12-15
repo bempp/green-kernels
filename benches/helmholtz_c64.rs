@@ -24,7 +24,7 @@ pub fn helmholtz_c64_test_standard(c: &mut Criterion) {
     let mut result = rlst_dynamic_array1!(c64, [NPOINTS]);
 
     sources.fill_from_equally_distributed(&mut rng);
-    targets.fill_from(sources.view());
+    targets.fill_from(sources.r());
 
     charges.fill_from_standard_normal(&mut rng);
 
