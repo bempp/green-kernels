@@ -3,7 +3,7 @@ nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
 sleef = ["rlst/sleef"]
-default = ["sleef", "mpi"]
+default = ["sleef"]
 mpi = ["dep:mpi", "dep:bempp-distributed-tools"]
 
 
@@ -31,7 +31,8 @@ approx = { version = "0.5", features = ["num-complex"] }
 rayon = "1.9"
 num = "0.4"
 num_cpus = "1"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", default-features = false }
+rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"] }
+# rlst = { path = "../rlst", features = ["mpi"] }
 rand = "0.8.5"
 itertools = { version = "0.13.0", default-features = false }
 coe-rs = "0.1.2"
@@ -76,5 +77,7 @@ harness = false
 name = "helmholtz_c64"
 harness = false
 
-
+[[example]]
+name = "evaluate_distributed"
+required-features = ["mpi"]
 
