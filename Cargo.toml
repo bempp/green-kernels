@@ -4,7 +4,7 @@ nightly = ["pulp/nightly"]
 strict = []
 sleef = ["rlst/sleef"]
 default = ["sleef"]
-mpi = ["dep:mpi", "dep:bempp-distributed-tools"]
+mpi = ["dep:mpi", "dep:bempp-distributed-tools", "rlst/mpi"]
 
 
 [package]
@@ -31,7 +31,7 @@ approx = { version = "0.5", features = ["num-complex"] }
 rayon = "1.9"
 num = "0.4"
 num_cpus = "1"
-rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"] }
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 # rlst = { path = "../rlst", features = ["mpi"] }
 rand = "0.8.5"
 itertools = { version = "0.13.0", default-features = false }
