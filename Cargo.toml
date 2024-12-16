@@ -3,7 +3,9 @@ nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
 sleef = ["rlst/sleef"]
-default = ["sleef"]
+default = ["sleef", "mpi"]
+mpi = ["dep:mpi", "dep:bempp-distributed-tools"]
+
 
 [package]
 name = "green-kernels"
@@ -36,6 +38,8 @@ coe-rs = "0.1.2"
 pulp = { version = "0.21" }
 bytemuck = "1.16.0"
 hexf = "0.2.1"
+mpi = { version = "0.8.*", optional = true }
+bempp-distributed-tools = { git = "https://github.com/bempp/distributed_tools.git", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
