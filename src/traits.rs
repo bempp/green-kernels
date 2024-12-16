@@ -121,6 +121,9 @@ pub trait Kernel: Sync {
 // again once we move to the better C interface in `c-api-tools`.
 
 /// Distributed evaluation of a Green's function kernel.
+///
+/// If `use_multithreaded` is set to true, the evaluation uses Rayon multi-threading on each rank.
+/// Otherwise, the evaluation on each rank is single-threaded.
 #[cfg(feature = "mpi")]
 pub trait DistributedKernelEvaluator: Kernel {
     fn evaluate_distributed<
@@ -135,6 +138,7 @@ pub trait DistributedKernelEvaluator: Kernel {
         targets: &DistributedVector<'_, TargetLayout, <Self::T as RlstScalar>::Real>,
         charges: &DistributedVector<'_, ChargeLayout, Self::T>,
         result: &mut DistributedVector<'_, ResultLayout, Self::T>,
+        use_multithreaded: bool,
     ) where
         Self::T: Equivalence,
         <Self::T as RlstScalar>::Real: Equivalence,
@@ -155,7 +159,8 @@ pub trait DistributedKernelEvaluator: Kernel {
 
         // Check that the output vector has the correct size.
         assert_eq!(
-            targets.index_layout().number_of_local_indices(),
+            self.range_component_count(eval_type)
+                * targets.index_layout().number_of_local_indices(),
             3 * result.index_layout().number_of_local_indices()
         );
 
@@ -186,13 +191,24 @@ pub trait DistributedKernelEvaluator: Kernel {
             root_process.broadcast_into(&mut root_charges.data_mut()[..]);
 
             // We now have the sources and charges on all ranks. We can now simply evaluate.
-            self.evaluate_mt(
-                eval_type,
-                &root_sources.data()[..],
-                targets.local().data(),
-                &root_charges.data()[..],
-                result.local_mut().data_mut(),
-            );
+
+            if use_multithreaded {
+                self.evaluate_mt(
+                    eval_type,
+                    &root_sources.data()[..],
+                    targets.local().data(),
+                    &root_charges.data()[..],
+                    result.local_mut().data_mut(),
+                );
+            } else {
+                self.evaluate_st(
+                    eval_type,
+                    &root_sources.data()[..],
+                    targets.local().data(),
+                    &root_charges.data()[..],
+                    result.local_mut().data_mut(),
+                );
+            }
         }
     }
 }

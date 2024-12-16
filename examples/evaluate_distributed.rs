@@ -12,13 +12,6 @@ use rlst::{
 };
 
 fn main() {
-    // Ensure that there is only one Rayon thread per process
-
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(1)
-        .build_global()
-        .unwrap();
-
     // Create the MPI communicator
     let universe = mpi::initialize().unwrap();
     let world = universe.world();
@@ -62,6 +55,7 @@ fn main() {
         &targets,
         &charges,
         &mut result,
+        false,
     );
 
     // We now check the result with an evaluation only on the first rank.
