@@ -5,7 +5,7 @@ use crate::types::GreenKernelEvalType;
 use mpi::traits::{Communicator, Equivalence, Root};
 use rlst::RlstScalar;
 #[cfg(feature = "mpi")]
-use rlst::{rlst_dynamic_array1, DistributedVector, IndexLayout, RawAccess, RawAccessMut};
+use rlst::{rlst_dynamic_array1, RawAccess, RawAccessMut};
 
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel: Sync {
@@ -126,45 +126,30 @@ pub trait Kernel: Sync {
 /// Otherwise, the evaluation on each rank is single-threaded.
 #[cfg(feature = "mpi")]
 pub trait DistributedKernelEvaluator: Kernel {
-    fn evaluate_distributed<
-        SourceLayout: IndexLayout,
-        TargetLayout: IndexLayout,
-        ChargeLayout: IndexLayout,
-        ResultLayout: IndexLayout,
-    >(
+    fn evaluate_distributed<C: Communicator>(
         &self,
         eval_type: GreenKernelEvalType,
-        sources: &DistributedVector<'_, SourceLayout, <Self::T as RlstScalar>::Real>,
-        targets: &DistributedVector<'_, TargetLayout, <Self::T as RlstScalar>::Real>,
-        charges: &DistributedVector<'_, ChargeLayout, Self::T>,
-        result: &mut DistributedVector<'_, ResultLayout, Self::T>,
+        sources: &[<Self::T as RlstScalar>::Real],
+        targets: &[<Self::T as RlstScalar>::Real],
+        charges: &[Self::T],
+        result: &mut [Self::T],
         use_multithreaded: bool,
+        comm: &C,
     ) where
         Self::T: Equivalence,
         <Self::T as RlstScalar>::Real: Equivalence,
     {
-        // We want that everything has the same communicator
-        assert!(std::ptr::addr_eq(
-            sources.index_layout().comm(),
-            charges.index_layout().comm()
-        ));
-        assert!(std::ptr::addr_eq(
-            sources.index_layout().comm(),
-            targets.index_layout().comm()
-        ));
-        assert!(std::ptr::addr_eq(
-            sources.index_layout().comm(),
-            result.index_layout().comm()
-        ));
+        // Check that the number of sources and number of charges are compatible.
+        assert_eq!(sources.len(), 3 * charges.len());
 
         // Check that the output vector has the correct size.
+        // Multiply result by 3 since targets have 3 components (x, y, z) direction.
         assert_eq!(
-            self.range_component_count(eval_type)
-                * targets.index_layout().number_of_local_indices(),
-            3 * result.index_layout().number_of_local_indices()
+            self.range_component_count(eval_type) * targets.len(),
+            3 * result.len()
         );
 
-        let size = sources.index_layout().comm().size();
+        let size = comm.size();
 
         // We now iterate through each rank associated with the sources and communicate from that rank
         // the sources to all target ranks.
@@ -172,19 +157,27 @@ pub trait DistributedKernelEvaluator: Kernel {
         for rank in 0..size as usize {
             // Communicate the sources and charges from `rank` to all ranks.
 
-            let root_process = sources.index_layout().comm().process_at_rank(rank as i32);
-            let source_range = sources.index_layout().index_range(rank).unwrap();
-            let charge_range = charges.index_layout().index_range(rank).unwrap();
-            let nsources = source_range.1 - source_range.0;
-            let ncharges = charge_range.1 - charge_range.0;
-            // Make sure that number of sources and charges are compatible.
-            assert_eq!(nsources, 3 * ncharges);
-            let mut root_sources = rlst_dynamic_array1!(<Self::T as RlstScalar>::Real, [nsources]);
-            let mut root_charges = rlst_dynamic_array1!(Self::T, [ncharges]);
-            // If we are on `rank` fill the sources and charges.
-            if sources.index_layout().comm().rank() == rank as i32 {
-                root_sources.fill_from(sources.local().r());
-                root_charges.fill_from(charges.local().r());
+            // We first need to tell all ranks how many sources and charges we have.
+            let root_process = comm.process_at_rank(rank as i32);
+
+            let nsources = {
+                let mut nsources;
+                if comm.rank() == rank as i32 {
+                    nsources = charges.len();
+                } else {
+                    nsources = 0;
+                }
+                root_process.broadcast_into(&mut nsources);
+                nsources
+            };
+
+            let mut root_sources =
+                rlst_dynamic_array1!(<Self::T as RlstScalar>::Real, [3 * nsources]);
+            let mut root_charges = rlst_dynamic_array1!(Self::T, [nsources]);
+
+            if comm.rank() == rank as i32 {
+                root_sources.data_mut().copy_from_slice(sources);
+                root_charges.data_mut().copy_from_slice(charges);
             }
 
             root_process.broadcast_into(&mut root_sources.data_mut()[..]);
@@ -196,17 +189,17 @@ pub trait DistributedKernelEvaluator: Kernel {
                 self.evaluate_mt(
                     eval_type,
                     &root_sources.data()[..],
-                    targets.local().data(),
+                    targets,
                     &root_charges.data()[..],
-                    result.local_mut().data_mut(),
+                    result,
                 );
             } else {
                 self.evaluate_st(
                     eval_type,
                     &root_sources.data()[..],
-                    targets.local().data(),
+                    targets,
                     &root_charges.data()[..],
-                    result.local_mut().data_mut(),
+                    result,
                 );
             }
         }
