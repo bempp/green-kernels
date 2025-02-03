@@ -3,7 +3,7 @@ nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
 sleef = ["rlst/sleef"]
-default = ["sleef"]
+default = []
 mpi = ["dep:mpi", "dep:bempp-distributed-tools", "rlst/mpi"]
 
 
