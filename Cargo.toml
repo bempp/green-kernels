@@ -33,8 +33,8 @@ num = "0.4"
 num_cpus = "1"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 # rlst = { path = "../rlst", features = ["mpi"] }
-rand = "0.9.0"
-itertools = { version = "0.14.0", default-features = false }
+rand = "0.8.5"
+itertools = { version = "0.13.0", default-features = false }
 coe-rs = "0.1.2"
 pulp = { version = "0.21" }
 bytemuck = "1.16.0"
@@ -44,7 +44,7 @@ bempp-distributed-tools = { git = "https://github.com/bempp/distributed_tools.gi
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
-rand_chacha = "0.9.0"
+rand_chacha = "0.3"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
