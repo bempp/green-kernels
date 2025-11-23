@@ -6,7 +6,8 @@ use crate::traits::Kernel;
 use crate::types::GreenKernelEvalType;
 use num::traits::FloatConst;
 use rayon::prelude::*;
-use rlst::{RlstScalar, RlstSimd, SimdFor};
+use rlst::simd::SimdFor;
+use rlst::{RlstScalar, RlstSimd};
 
 /// Kernel for Modified Helmholtz in 3D
 #[derive(Clone, Copy)]
@@ -1100,9 +1101,7 @@ mod test {
     use itertools::izip;
     use paste::paste;
     use rand::prelude::*;
-    use rlst::prelude::*;
-
-    use rlst::rlst_dynamic_array1;
+    use rlst::rlst_dynamic_array;
 
     macro_rules! impl_modified_helmholtz_tests {
         ($scalar:ty, $delta:expr, $deriv_eps:expr, $eps:expr) => {
@@ -1117,8 +1116,8 @@ mod test {
                         let omega = 1.5;
 
                         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-                        let mut source = rlst_dynamic_array1!($scalar, [3]);
-                        let mut target = rlst_dynamic_array1!($scalar, [3]);
+                        let mut source = rlst_dynamic_array!($scalar, [3]);
+                        let mut target = rlst_dynamic_array!($scalar, [3]);
 
                         source.fill_from_equally_distributed(&mut rng);
                         target.fill_from_equally_distributed(&mut rng);
@@ -1131,25 +1130,25 @@ mod test {
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                             GreenKernelEvalType::Value,
-                            source.data(),
-                            target.data(),
+                            source.data().unwrap(),
+                            target.data().unwrap(),
                             actual_value.as_mut_slice(),
                         );
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                             GreenKernelEvalType::ValueDeriv,
-                            source.data(),
-                            target.data(),
+                            source.data().unwrap(),
+                            target.data().unwrap(),
                             actual_deriv.as_mut_slice(),
                         );
 
-                        let mut target_x = rlst_dynamic_array1!($scalar, [3]);
-                        let mut target_y = rlst_dynamic_array1!($scalar, [3]);
-                        let mut target_z = rlst_dynamic_array1!($scalar, [3]);
+                        let mut target_x = rlst_dynamic_array!($scalar, [3]);
+                        let mut target_y = rlst_dynamic_array!($scalar, [3]);
+                        let mut target_z = rlst_dynamic_array!($scalar, [3]);
 
-                        target_y.fill_from(target.r());
-                        target_z.fill_from(target.r());
-                        target_x.fill_from(target.r());
+                        target_y.fill_from(&target);
+                        target_z.fill_from(&target);
+                        target_x.fill_from(&target);
 
                         target_x[[0]] += delta;
                         target_y[[1]] += delta;
@@ -1157,22 +1156,22 @@ mod test {
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                             GreenKernelEvalType::Value,
-                            source.data(),
-                            target_x.data(),
+                            source.data().unwrap(),
+                            target_x.data().unwrap(),
                             expected_deriv_x.as_mut_slice(),
                         );
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                             GreenKernelEvalType::Value,
-                            source.data(),
-                            target_y.data(),
+                            source.data().unwrap(),
+                            target_y.data().unwrap(),
                             expected_deriv_y.as_mut_slice(),
                         );
 
                         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                             GreenKernelEvalType::Value,
-                            source.data(),
-                            target_z.data(),
+                            source.data().unwrap(),
+                            target_z.data().unwrap(),
                             expected_deriv_z.as_mut_slice(),
                         );
 
@@ -1205,8 +1204,8 @@ mod test {
                 let omega = 0.0;
 
                 let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-                let mut source = rlst_dynamic_array1!($scalar, [3]);
-                let mut target = rlst_dynamic_array1!($scalar, [3]);
+                let mut source = rlst_dynamic_array!($scalar, [3]);
+                let mut target = rlst_dynamic_array!($scalar, [3]);
 
                 source.fill_from_equally_distributed(&mut rng);
                 target.fill_from_equally_distributed(&mut rng);
@@ -1216,15 +1215,15 @@ mod test {
 
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                     GreenKernelEvalType::ValueDeriv,
-                    source.data(),
-                    target.data(),
+                    source.data().unwrap(),
+                    target.data().unwrap(),
                     actual_deriv.as_mut_slice(),
                 );
 
                 Laplace3dKernel::<$scalar>::new().greens_fct(
                     GreenKernelEvalType::ValueDeriv,
-                    source.data(),
-                    target.data(),
+                    source.data().unwrap(),
+                    target.data().unwrap(),
                     expected_deriv.as_mut_slice(),
                 );
 
@@ -1242,33 +1241,33 @@ mod test {
 
                 let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
-                let mut sources = rlst_dynamic_array2!($scalar, [3, npoints]);
-                let mut targets = rlst_dynamic_array2!($scalar, [3, npoints]);
+                let mut sources = rlst_dynamic_array!($scalar, [3, npoints]);
+                let mut targets = rlst_dynamic_array!($scalar, [3, npoints]);
 
                 sources.fill_from_equally_distributed(&mut rng);
                 targets.fill_from_equally_distributed(&mut rng);
 
-                let mut result_value = rlst_dynamic_array1!($scalar, [npoints]);
-                let mut result_value_deriv = rlst_dynamic_array2!($scalar, [4, npoints]);
+                let mut result_value = rlst_dynamic_array!($scalar, [npoints]);
+                let mut result_value_deriv = rlst_dynamic_array!($scalar, [4, npoints]);
 
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_pairwise_st(
                     GreenKernelEvalType::Value,
-                    sources.data(),
-                    targets.data(),
-                    result_value.data_mut(),
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    result_value.data_mut().unwrap(),
                 );
 
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_pairwise_st(
                     GreenKernelEvalType::ValueDeriv,
-                    sources.data(),
-                    targets.data(),
-                    result_value_deriv.data_mut(),
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    result_value_deriv.data_mut().unwrap(),
                 );
 
                 for (s, t, res_value, res_deriv) in izip!(
                     sources.col_iter(),
                     targets.col_iter(),
-                    result_value.iter(),
+                    result_value.iter_value(),
                     result_value_deriv.col_iter()
                 ) {
                     let mut expected_val = [0.0; 1];
@@ -1276,21 +1275,21 @@ mod test {
 
                     ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                         GreenKernelEvalType::Value,
-                        s.data(),
-                        t.data(),
+                        s.data().unwrap(),
+                        t.data().unwrap(),
                         expected_val.as_mut_slice(),
                     );
 
                     ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                         GreenKernelEvalType::ValueDeriv,
-                        s.data(),
-                        t.data(),
+                        s.data().unwrap(),
+                        t.data().unwrap(),
                         expected_deriv.as_mut_slice(),
                     );
 
                     assert_relative_eq!(res_value, expected_val[0], max_relative = eps);
 
-                    for (a, &e) in izip!(res_deriv.iter(), expected_val.iter()) {
+                    for (a, &e) in izip!(res_deriv.iter_value(), expected_val.iter()) {
                         assert_relative_eq!(a, e, max_relative = eps);
                     }
                 }
@@ -1306,9 +1305,9 @@ mod test {
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
-        let mut sources = rlst_dynamic_array2!($scalar, [3, nsources]);
-        let mut targets = rlst_dynamic_array2!($scalar, [3, ntargets]);
-        let mut charges = rlst_dynamic_array1!($scalar, [nsources]);
+        let mut sources = rlst_dynamic_array!($scalar, [3, nsources]);
+        let mut targets = rlst_dynamic_array!($scalar, [3, ntargets]);
+        let mut charges = rlst_dynamic_array!($scalar, [nsources]);
 
         sources.fill_from_equally_distributed(&mut rng);
         targets.fill_from_equally_distributed(&mut rng);
@@ -1316,27 +1315,27 @@ mod test {
 
         // Evaluate expected contribution.
 
-        let mut expected_value = rlst_dynamic_array1!($scalar, [ntargets]);
-        let mut expected_value_deriv = rlst_dynamic_array2!($scalar, [4, ntargets]);
+        let mut expected_value = rlst_dynamic_array!($scalar, [ntargets]);
+        let mut expected_value_deriv = rlst_dynamic_array!($scalar, [4, ntargets]);
 
         for (e_val, target, mut e_val_deriv) in izip!(
             expected_value.iter_mut(),
             targets.col_iter(),
             expected_value_deriv.col_iter_mut()
         ) {
-            for (source, charge) in izip!(sources.col_iter(), charges.iter()) {
+            for (source, charge) in izip!(sources.col_iter(), charges.iter_value()) {
                 let mut res_val = [0.0];
                 let mut res_val_deriv = [0.0; 4];
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                     GreenKernelEvalType::Value,
-                    source.data(),
-                    target.data(),
+                    source.data().unwrap(),
+                    target.data().unwrap(),
                     res_val.as_mut_slice(),
                 );
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                     GreenKernelEvalType::ValueDeriv,
-                    source.data(),
-                    target.data(),
+                    source.data().unwrap(),
+                    target.data().unwrap(),
                     res_val_deriv.as_mut_slice(),
                 );
 
@@ -1350,28 +1349,28 @@ mod test {
 
         // Now compute the actual contribution
 
-        let mut actual_value = rlst_dynamic_array1!($scalar, [ntargets]);
-        let mut actual_value_deriv = rlst_dynamic_array2!($scalar, [4, ntargets]);
+        let mut actual_value = rlst_dynamic_array!($scalar, [ntargets]);
+        let mut actual_value_deriv = rlst_dynamic_array!($scalar, [4, ntargets]);
 
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).evaluate_st(
             GreenKernelEvalType::Value,
-            sources.data(),
-            targets.data(),
-            charges.data(),
-            actual_value.data_mut(),
+            sources.data().unwrap(),
+            targets.data().unwrap(),
+            charges.data().unwrap(),
+            actual_value.data_mut().unwrap(),
         );
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).evaluate_st(
             GreenKernelEvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            charges.data(),
-            actual_value_deriv.data_mut(),
+            sources.data().unwrap(),
+            targets.data().unwrap(),
+            charges.data().unwrap(),
+            actual_value_deriv.data_mut().unwrap(),
         );
 
-        for (a, e) in izip!(actual_value.iter(), expected_value.iter()) {
+        for (a, e) in izip!(actual_value.iter_value(), expected_value.iter_value()) {
             assert_relative_eq!(a, e, max_relative = eps);
         }
-        for (a, e) in izip!(actual_value_deriv.iter(), expected_value_deriv.iter()) {
+        for (a, e) in izip!(actual_value_deriv.iter_value(), expected_value_deriv.iter_value()) {
             assert_relative_eq!(a, e, max_relative = eps);
         }
     }
@@ -1386,28 +1385,28 @@ mod test {
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
-        let mut sources = rlst_dynamic_array2!($scalar, [3, nsources]);
-        let mut targets = rlst_dynamic_array2!($scalar, [3, ntargets]);
+        let mut sources = rlst_dynamic_array!($scalar, [3, nsources]);
+        let mut targets = rlst_dynamic_array!($scalar, [3, ntargets]);
 
         sources.fill_from_equally_distributed(&mut rng);
         targets.fill_from_equally_distributed(&mut rng);
 
         // Now compute the actual contribution
 
-        let mut actual_value = rlst_dynamic_array2!($scalar, [nsources, ntargets]);
-        let mut actual_value_deriv = rlst_dynamic_array2!($scalar, [4 * nsources, ntargets]);
+        let mut actual_value = rlst_dynamic_array!($scalar, [nsources, ntargets]);
+        let mut actual_value_deriv = rlst_dynamic_array!($scalar, [4 * nsources, ntargets]);
 
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_st(
             GreenKernelEvalType::Value,
-            sources.data(),
-            targets.data(),
-            actual_value.data_mut(),
+            sources.data().unwrap(),
+            targets.data().unwrap(),
+            actual_value.data_mut().unwrap(),
         );
         ModifiedHelmholtz3dKernel::<$scalar>::new(omega).assemble_st(
             GreenKernelEvalType::ValueDeriv,
-            sources.data(),
-            targets.data(),
-            actual_value_deriv.data_mut(),
+            sources.data().unwrap(),
+            targets.data().unwrap(),
+            actual_value_deriv.data_mut().unwrap(),
         );
 
         // Evaluate expected contribution.
@@ -1418,14 +1417,14 @@ mod test {
                 let mut expected_val_deriv = [0.0; 4];
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                     GreenKernelEvalType::Value,
-                    source.data(),
-                    target.data(),
+                    source.data().unwrap(),
+                    target.data().unwrap(),
                     expected_val.as_mut_slice(),
                 );
                 ModifiedHelmholtz3dKernel::<$scalar>::new(omega).greens_fct(
                     GreenKernelEvalType::ValueDeriv,
-                    source.data(),
-                    target.data(),
+                    source.data().unwrap(),
+                    target.data().unwrap(),
                     expected_val_deriv.as_mut_slice(),
                 );
 

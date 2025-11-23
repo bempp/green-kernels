@@ -2,9 +2,8 @@
 nightly = ["pulp/nightly"]
 # Treat warnings as a build error.
 strict = []
-sleef = ["rlst/sleef"]
-default = []
-mpi = ["dep:mpi", "dep:bempp-distributed-tools", "rlst/mpi"]
+default = ["mpi"]
+mpi = ["dep:mpi", "rlst/mpi"]
 
 
 [package]
@@ -28,23 +27,21 @@ crate-type = ["lib", "staticlib", "cdylib"]
 paste = "1.*"
 libc = "0.2"
 approx = { version = "0.5", features = ["num-complex"] }
-rayon = "1.9"
+rayon = "1.11"
 num = "0.4"
 num_cpus = "1"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-# rlst = { path = "../rlst", features = ["mpi"] }
-rand = "0.8.5"
-itertools = { version = "0.13.0", default-features = false }
+rand = "0.9"
+itertools = { version = "0.14", default-features = false }
 coe-rs = "0.1.2"
-pulp = { version = "0.21" }
-bytemuck = "1.16.0"
+pulp = { version = "0.22" }
+bytemuck = "1.24.0"
 hexf = "0.2.1"
-mpi = { version = "0.8.*", optional = true }
-bempp-distributed-tools = { git = "https://github.com/bempp/distributed_tools.git", optional = true }
+mpi = { git = "https://github.com/rsmpi/rsmpi.git", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
-rand_chacha = "0.3"
+criterion = { version = "0.7", features = ["html_reports"] }
+rand_chacha = "0.9"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
@@ -53,12 +50,12 @@ cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 wildcard_imports = "forbid"
 
 [target.aarch64-apple-darwin.dev-dependencies]
-blas-src = { version = "0.10", features = ["accelerate"]}
-lapack-src = { version = "0.10", features = ["accelerate"]}
+blas-src = { version = "0.14", features = ["accelerate"]}
+lapack-src = { version = "0.13", features = ["accelerate"]}
 
 [target.x86_64-unknown-linux-gnu.dev-dependencies]
-blas-src = { version = "0.10", features = ["blis"]}
-lapack-src = { version = "0.10", features = ["netlib"]}
+blas-src = { version = "0.14", features = ["blis"]}
+lapack-src = { version = "0.13", features = ["netlib"]}
 
 
 [[bench]]

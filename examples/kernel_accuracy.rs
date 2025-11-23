@@ -3,35 +3,36 @@
 const NSAMPLES: usize = 100;
 use num::{traits::FloatConst, Float};
 use rand::prelude::*;
-use rlst::{dense::tools::RandScalar, prelude::*};
 
 use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel,
     modified_helmholtz_3d::ModifiedHelmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType,
 };
+use rlst::{c32, c64, rlst_dynamic_array, AbsSquare, DynArray, RandScalar, RlstScalar};
 
 fn benchmark_kernel_laplace<T: RlstScalar + RandScalar, K: Kernel<T = T>>(
     kernel: &K,
-    sources: &DynamicArray<T::Real, 2>,
-    targets: &DynamicArray<T::Real, 2>,
+    sources: &DynArray<T::Real, 2>,
+    targets: &DynArray<T::Real, 2>,
 ) -> T::Real
 where
     T::Real: num::Float,
+    T::Real: AbsSquare<Output = T::Real>,
 {
-    let mut result = rlst_dynamic_array2!(T, [NSAMPLES, NSAMPLES]);
+    let mut result = rlst_dynamic_array!(T, [NSAMPLES, NSAMPLES]);
 
     kernel.assemble_mt(
         GreenKernelEvalType::Value,
-        sources.data(),
-        targets.data(),
-        result.data_mut(),
+        sources.data().unwrap(),
+        targets.data().unwrap(),
+        result.data_mut().unwrap(),
     );
 
     let mut rel_error: T::Real = <T::Real>::default();
 
     for (source_index, source) in sources.col_iter().enumerate() {
         for (target_index, target) in targets.col_iter().enumerate() {
-            let diff_norm = (source.r() - target.r()).norm_2();
+            let diff_norm = (source.r() - target.r()).norm_2().unwrap();
             let green = result[[source_index, target_index]];
             let green_exact = T::one()
                 / (num::cast::<f64, T>(4.0 * f64::PI()).unwrap()
@@ -47,26 +48,27 @@ where
 
 fn benchmark_kernel_modified_helmholtz<T: RlstScalar + RandScalar, K: Kernel<T = T>>(
     kernel: &K,
-    sources: &DynamicArray<T::Real, 2>,
-    targets: &DynamicArray<T::Real, 2>,
+    sources: &DynArray<T::Real, 2>,
+    targets: &DynArray<T::Real, 2>,
 ) -> T::Real
 where
     T::Real: num::Float,
+    T::Real: AbsSquare<Output = T::Real>,
 {
-    let mut result = rlst_dynamic_array2!(T, [NSAMPLES, NSAMPLES]);
+    let mut result = rlst_dynamic_array!(T, [NSAMPLES, NSAMPLES]);
 
     kernel.assemble_mt(
         GreenKernelEvalType::Value,
-        sources.data(),
-        targets.data(),
-        result.data_mut(),
+        sources.data().unwrap(),
+        targets.data().unwrap(),
+        result.data_mut().unwrap(),
     );
 
     let mut rel_error: T::Real = <T::Real>::default();
 
     for (source_index, source) in sources.col_iter().enumerate() {
         for (target_index, target) in targets.col_iter().enumerate() {
-            let diff_norm = (source.r() - target.r()).norm_2();
+            let diff_norm = (source.r() - target.r()).norm_2().unwrap();
             let green = result[[source_index, target_index]];
             let green_exact = T::exp(T::from_real(
                 num::cast::<f64, T::Real>(-1.5).unwrap() * diff_norm,
@@ -83,26 +85,27 @@ where
 
 fn benchmark_kernel_helmholtz<T: RlstScalar<Complex = T> + RandScalar, K: Kernel<T = T>>(
     kernel: &K,
-    sources: &DynamicArray<T::Real, 2>,
-    targets: &DynamicArray<T::Real, 2>,
+    sources: &DynArray<T::Real, 2>,
+    targets: &DynArray<T::Real, 2>,
 ) -> T::Real
 where
     T::Real: num::Float,
+    T::Real: AbsSquare<Output = T::Real>,
 {
-    let mut result = rlst_dynamic_array2!(T, [NSAMPLES, NSAMPLES]);
+    let mut result = rlst_dynamic_array!(T, [NSAMPLES, NSAMPLES]);
 
     kernel.assemble_mt(
         GreenKernelEvalType::Value,
-        sources.data(),
-        targets.data(),
-        result.data_mut(),
+        sources.data().unwrap(),
+        targets.data().unwrap(),
+        result.data_mut().unwrap(),
     );
 
     let mut rel_error: T::Real = <T::Real>::default();
 
     for (source_index, source) in sources.col_iter().enumerate() {
         for (target_index, target) in targets.col_iter().enumerate() {
-            let diff_norm = (source.r() - target.r()).norm_2();
+            let diff_norm = (source.r() - target.r()).norm_2().unwrap();
             let green = result[[source_index, target_index]];
             let green_exact = T::complex(
                 T::cos(T::from_real(
@@ -125,10 +128,10 @@ where
 
 fn main() {
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-    let mut sources_f32 = rlst_dynamic_array2!(f32, [3, NSAMPLES]);
-    let mut targets_f32 = rlst_dynamic_array2!(f32, [3, NSAMPLES]);
-    let mut sources_f64 = rlst_dynamic_array2!(f64, [3, NSAMPLES]);
-    let mut targets_f64 = rlst_dynamic_array2!(f64, [3, NSAMPLES]);
+    let mut sources_f32 = rlst_dynamic_array!(f32, [3, NSAMPLES]);
+    let mut targets_f32 = rlst_dynamic_array!(f32, [3, NSAMPLES]);
+    let mut sources_f64 = rlst_dynamic_array!(f64, [3, NSAMPLES]);
+    let mut targets_f64 = rlst_dynamic_array!(f64, [3, NSAMPLES]);
 
     sources_f32.fill_from_equally_distributed(&mut rng);
     targets_f32.fill_from_equally_distributed(&mut rng);

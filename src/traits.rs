@@ -4,8 +4,6 @@ use crate::types::GreenKernelEvalType;
 #[cfg(feature = "mpi")]
 use mpi::traits::{Communicator, Equivalence, Root};
 use rlst::RlstScalar;
-#[cfg(feature = "mpi")]
-use rlst::{rlst_dynamic_array1, RawAccess, RawAccessMut};
 
 /// Interface to evaluating Green's functions for given sources and targets.
 pub trait Kernel: Sync {
@@ -24,17 +22,17 @@ pub trait Kernel: Sync {
     /// Single threaded evaluation of Green's functions.
     ///
     /// - `eval_type`: Either [EvalType::Value] to only return Green's function values
-    ///              or [EvalType::ValueDeriv] to return values and derivatives.
+    ///   or [EvalType::ValueDeriv] to return values and derivatives.
     /// - `sources`: A slice defining the source points. The points must be given in the form
-    ///            `[x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]`, that is
-    ///            the value for each dimension must be continuously contained in the slice.
+    ///   `[x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]`, that is
+    ///   the value for each dimension must be continuously contained in the slice.
     /// - `targets`: A slice defining the targets. The memory layout is the same as for sources.
     /// - `charges`: A slice defining the charges. For each source point there needs to be one charge.
     /// - `result`: The result array. If the kernel is RlstScalar and `eval_type` has the value [EvalType::Value]
-    ///           then `result` has the same number of elemens as there are targets. For a RlstScalar kernel
-    ///           in three dimensional space if [EvalType::ValueDeriv] was chosen then `result` contains
-    ///           for each target in consecutive order the value of the kernel and the three components
-    ///           of its derivative.
+    ///   then `result` has the same number of elemens as there are targets. For a RlstScalar kernel
+    ///   in three dimensional space if [EvalType::ValueDeriv] was chosen then `result` contains
+    ///   for each target in consecutive order the value of the kernel and the three components
+    ///   of its derivative.
     ///
     fn evaluate_st(
         &self,
@@ -61,18 +59,18 @@ pub trait Kernel: Sync {
     /// Single threaded assembly of a kernel matrix.
     ///
     /// - `eval_type`: Either [EvalType::Value] to only return Green's function values
-    ///              or [EvalType::ValueDeriv] to return values and derivatives.
+    ///   or [EvalType::ValueDeriv] to return values and derivatives.
     /// - `sources`: A slice defining the source points. The points must be given in the form
-    ///            `[x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]`, that is
-    ///            the value for each dimension must be continuously contained in the slice.
+    ///   `[x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]`, that is
+    ///   the value for each dimension must be continuously contained in the slice.
     /// - `targets`: A slice defining the targets. The memory layout is the same as for sources.
     /// - `result`: The result array. If the kernel is RlstScalar and `eval_type` has the value [EvalType::Value]
-    ///           then `result` is equivalent to a column major matrix of dimension [S, T], where S is the number of sources and
-    ///           T is the number of targets. Hence, for each target all corresponding source evaluations are consecutively in memory.
-    ///           For a RlstScalar kernel in three dimensional space if [EvalType::ValueDeriv] was chosen then `result` is equivalent
-    ///           to a column-major matrix of dimension [4 * S, T], where the first 4 rows are the values of Green's fct. value and
-    ///           derivatives for the first source and all targets. The next 4 rows correspond to values and derivatives of second source
-    ///           with all targets and so on.
+    ///   then `result` is equivalent to a column major matrix of dimension [S, T], where S is the number of sources and
+    ///   T is the number of targets. Hence, for each target all corresponding source evaluations are consecutively in memory.
+    ///   For a RlstScalar kernel in three dimensional space if [EvalType::ValueDeriv] was chosen then `result` is equivalent
+    ///   to a column-major matrix of dimension [4 * S, T], where the first 4 rows are the values of Green's fct. value and
+    ///   derivatives for the first source and all targets. The next 4 rows correspond to values and derivatives of second source
+    ///   with all targets and so on.
     ///
     fn assemble_st(
         &self,
@@ -126,6 +124,7 @@ pub trait Kernel: Sync {
 /// Otherwise, the evaluation on each rank is single-threaded.
 #[cfg(feature = "mpi")]
 pub trait DistributedKernelEvaluator: Kernel {
+    #[allow(clippy::too_many_arguments)]
     fn evaluate_distributed<C: Communicator>(
         &self,
         eval_type: GreenKernelEvalType,
@@ -158,6 +157,8 @@ pub trait DistributedKernelEvaluator: Kernel {
             // Communicate the sources and charges from `rank` to all ranks.
 
             // We first need to tell all ranks how many sources and charges we have.
+
+            use rlst::rlst_dynamic_array;
             let root_process = comm.process_at_rank(rank as i32);
 
             let nsources = {
@@ -172,33 +173,33 @@ pub trait DistributedKernelEvaluator: Kernel {
             };
 
             let mut root_sources =
-                rlst_dynamic_array1!(<Self::T as RlstScalar>::Real, [3 * nsources]);
-            let mut root_charges = rlst_dynamic_array1!(Self::T, [nsources]);
+                rlst_dynamic_array!(<Self::T as RlstScalar>::Real, [3 * nsources]);
+            let mut root_charges = rlst_dynamic_array!(Self::T, [nsources]);
 
             if comm.rank() == rank as i32 {
-                root_sources.data_mut().copy_from_slice(sources);
-                root_charges.data_mut().copy_from_slice(charges);
+                root_sources.data_mut().unwrap().copy_from_slice(sources);
+                root_charges.data_mut().unwrap().copy_from_slice(charges);
             }
 
-            root_process.broadcast_into(&mut root_sources.data_mut()[..]);
-            root_process.broadcast_into(&mut root_charges.data_mut()[..]);
+            root_process.broadcast_into(&mut root_sources.data_mut().unwrap()[..]);
+            root_process.broadcast_into(&mut root_charges.data_mut().unwrap()[..]);
 
             // We now have the sources and charges on all ranks. We can now simply evaluate.
 
             if use_multithreaded {
                 self.evaluate_mt(
                     eval_type,
-                    &root_sources.data()[..],
+                    root_sources.data().unwrap(),
                     targets,
-                    &root_charges.data()[..],
+                    root_charges.data().unwrap(),
                     result,
                 );
             } else {
                 self.evaluate_st(
                     eval_type,
-                    &root_sources.data()[..],
+                    root_sources.data().unwrap(),
                     targets,
-                    &root_charges.data()[..],
+                    root_charges.data().unwrap(),
                     result,
                 );
             }
