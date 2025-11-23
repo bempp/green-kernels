@@ -1,8 +1,7 @@
 //! C Interface
 
 use coe;
-use rlst::prelude::*;
-use rlst::RlstScalar;
+use rlst::{c32, c64, RlstScalar};
 use std::{ffi::c_void, mem::ManuallyDrop};
 
 use crate::helmholtz_3d::Helmholtz3dKernel;
